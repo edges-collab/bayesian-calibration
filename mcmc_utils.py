@@ -1,0 +1,170 @@
+import click
+from rich.console import Console
+from rich.logging import RichHandler
+import logging
+import alan_data_utils as ut
+from pathlib import Path
+import numpy as np
+from datetime import datetime
+import importlib
+
+cns = Console(width=200)
+log = logging.getLogger(__name__)
+log.addHandler(RichHandler(rich_tracebacks=True, console=cns))
+
+main = click.Group()
+
+def get_evidence(root: str) -> float:
+    with open(root + ".stats") as fl:
+        for line in fl.readlines():
+            if line.startswith("log(Z)"):
+                return float(line.split('=')[1].split('+/-')[0].strip())
+    return np.nan
+
+def get_all_files(direc, running_only: bool, complete_only: bool, glob=(), exc_glob=()) -> tuple[dict[str, Path], set[Path]]:
+    direc = Path(direc)
+
+    suffix = '.paramnames' if complete_only else '.stats'
+    
+    runs = set()
+
+    if not glob:
+        glob = ('',)
+
+    for gl in glob:
+        gl = f"*{gl}*" if gl else '*'
+        runs.update({fl.with_suffix("") for fl in direc.glob(gl+suffix)})
+
+    for gl in exc_glob:
+        runs = {r for r in runs if gl not in str(r)}
+
+    completed = {fl for fl in runs if fl.with_suffix('.paramnames').exists()}
+
+    if running_only:
+        runs = {fl for fl in runs if fl not in completed}
+
+    return {fl.with_suffix('').name: fl for fl in runs}, completed
+    
+
+@main.command()
+@click.argument('direc', type=click.Path(exists=True, file_okay=False))
+@click.option("--running-only/--not-running-only", default=False, help="Only show MCMCs that are still running.")
+@click.option('-c/-C', "--complete-only/--not-complete-only", default=False, help='Only show completed runs')
+@click.option('-e/-E', "--show-evidence/--no-evidence", default=True, help='Print out evidence for run if available')
+@click.option("--glob", multiple=True, help='Glob pattern that must be included to print')
+@click.option("--exc-glob", multiple=True, help='Glob pattern that must be included to print')
+def show(direc, running_only: bool, complete_only: bool, show_evidence: bool, glob: list[str], exc_glob: list[str]):
+    direc = Path(direc)
+
+    names, completed = get_all_files(direc, running_only, complete_only, glob, exc_glob)
+
+    evidence = {name: get_evidence(str(fl.parent / name)) for name, fl in names.items() if fl in completed}
+
+    cns.print(f"[bold]Runs for {direc}:[/]")
+
+    for name, fl in sorted(names.items()):
+        cns.print(f"[blue]{name}[/]\t", end="")
+        if name in evidence:
+            cns.print(f"lnZ={evidence[name]:.1f}", end='\t')
+        else:
+            cns.print("[red](Still Running...)[/]", end='\t')
+
+        mod_time = datetime.fromtimestamp(fl.with_suffix('.txt').stat().st_mtime)
+        cns.print(mod_time.strftime('%Y-%m-%d %H:%M'))
+
+
+@main.command()
+@click.argument('direc', type=click.Path(exists=True, file_okay=False))
+@click.argument("config", type=click.Path(exists=True, dir_okay=False))
+@click.option("--dry/--not-dry", default=False)
+def rename(direc, config, dry):
+    direc = Path(direc)
+    names, _ = get_all_files(direc, running_only=False, complete_only=True)
+
+    endings = [
+        '_dead-birth.txt',
+        '_dead.txt',
+        '_equal_weights.txt',
+        '.paramnames',
+        '_phys_live-birth.txt',
+        '_phys_live.txt',
+        '.prior_info',
+        '_prior.txt',
+        '.ranges',
+        '.resume',
+        '_src_temps.npz',
+        '.stats',
+        '.txt',
+        '.meta.yml'
+    ]
+    
+    config = Path(config)
+    mdl = importlib.import_module(config.with_suffix('').name)
+
+    for root in names.values():
+    
+        kwargs = mdl.get_kwargs(root.name)
+        label = mdl.get_label(**kwargs)
+
+        printed = False
+        for ending in endings:
+            fl = Path(str(root) + ending)
+
+            new_file = str((root.parent / label)) + ending
+            if str(fl) == str(new_file) or not fl.exists():
+                continue
+            
+            if not printed:
+                cns.print(f"[bold]Replacing [blue]{str(root)}[/]  ⟶  [green]{str((root.parent / label))}[/]")
+                printed=True
+                cns.print(f' ⇒ {ending}', end='')
+
+            else:
+                cns.print(' | ' + ending, end='')
+
+            if not dry:
+                fl.rename(new_file)
+
+        if printed:
+            cns.print()
+
+
+@main.command()
+@click.argument('direc', type=click.Path(exists=True, file_okay=False))
+@click.option("--dry/--not-dry", default=False)
+@click.option("--glob", multiple=True, help='Glob pattern that must be included to remove')
+@click.option("--exc-glob", multiple=True, help='Glob pattern that must NOT be included to remove')
+def rm(direc, dry, glob, exc_glob):
+    direc = Path(direc)
+    names, _ = get_all_files(direc, running_only=False, complete_only=False, glob=glob, exc_glob=exc_glob)
+
+    endings = [
+        '_dead-birth.txt',
+        '_dead.txt',
+        '_equal_weights.txt',
+        '.paramnames',
+        '_phys_live-birth.txt',
+        '_phys_live.txt',
+        '.prior_info',
+        '_prior.txt',
+        '.ranges',
+        '.resume',
+        '_src_temps.npz',
+        '.stats',
+        '.txt',
+        '_blobs.npz'
+    ]
+
+    for root in names.values():
+
+        for ending in endings:
+            fl = Path(str(root) + ending)
+
+            if fl.exists():
+                cns.print(f'[bold]Removing [blue]{fl}[/]')
+
+                if not dry:
+                    fl.unlink()
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,6 @@
+outputs/
+__pycache__/
+plots/
+calfiles/
+.ipynb_checkpoints/
+.vscode/
