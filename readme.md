@@ -5,18 +5,13 @@ general development of the idea of Bayesian Calibration in EDGES.
 
 Paper URL: https://www.overleaf.com/9477723471yvqbvyshqjph
 
-The main development notebook is `devel-bayesian-cal.ipynb`: this is a non-production notebook where stuff gets tinkered with.
-All configuration files, outputs etc. for this notebook are in the `development/` folder.
-
-The main notebook for the paper (producing plots etc) is `paper-plots.ipynb`.
-
-This directory also contains a notebook going through an application of the bayesian calibration on the Nature Paper
-data. This notebook is `nature-paper-recal.ipynb`. All data/figures/configs/outputs for this notebook are in
-`nature-paper/`.
+The main development notebook is `devel-bayesian-cal.ipynb`: this is a non-production 
+notebook where stuff gets tinkered with. Notably, it contains math etc. for the 
+variance model. All configuration files, outputs etc. for this notebook are in the
+`development/` folder.
 
 Over time, I've tried a few different bits of data and tests etc. First, I tried 
-(re-)calibrating Raul's data. His data is in `raul-data/` and the associated notebook
-is (I think) the `nature-paper-recal.ipynb`.
+(re-)calibrating Raul's data. His data is in `raul-data/`. I didn't pursue this.
 
 The final results will be with Alan's data (in order to make it as close to the NP as 
 possible). All data *coming from Alan* is in `alan-data/`. 
