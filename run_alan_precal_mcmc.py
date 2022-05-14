@@ -458,7 +458,7 @@ def run_lk(
         if err and raise_on_prior:
             raise MCMCBoundsError("Parameter posteriors are out of prior bounds!")
 
-    return samples, err
+        return samples, err
 
 def optimize_lk(lk, truth, prior_width, folder, label, dual_annealing: bool=False, niter: int=10, set_widths=False):
     if mpi.am_single_or_primary_process:
@@ -508,8 +508,9 @@ def optimize_lk(lk, truth, prior_width, folder, label, dual_annealing: bool=Fals
         widths = prior_width * std
         resx = opt_res.x
 
-        cns.print("[bold]Estimated Parameters: [/]", resx)
-        cns.print("[bold]Widths of Parameters: [/]", widths)
+        cns.print("[bold]Estimated Parameters: [/]")
+        for p, r, s in zip(lk.partial_linear_model.child_active_params, resx, std):
+            cns.print(f"\t{p.name:>14}: {r:1.3e} +- {s:1.3e}")
 
         f = [f for _, f in minima]
         minf = min(f)
