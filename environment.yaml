@@ -18,4 +18,5 @@ dependencies:
     - yabf
     - getdist
     - tqdm
+    - GitPython
 prefix: /home/smurray/miniconda3/envs/edges

@@ -100,22 +100,29 @@ def rename(direc, config, dry):
     
     config = Path(config)
     mdl = importlib.import_module(config.with_suffix('').name)
+    print(mdl, mdl.__dict__)
 
     for root in names.values():
     
         kwargs = mdl.get_kwargs(root.name)
         label = mdl.get_label(**kwargs)
 
+        new_folder = root.parent / label
+
+        if not new_folder.exists():
+            new_folder.mkdir()
+
         printed = False
         for ending in endings:
             fl = Path(str(root) + ending)
 
-            new_file = str((root.parent / label)) + ending
+            new_file = new_folder / ('bayescal' + ending)
+
             if str(fl) == str(new_file) or not fl.exists():
                 continue
             
             if not printed:
-                cns.print(f"[bold]Replacing [blue]{str(root)}[/]  ⟶  [green]{str((root.parent / label))}[/]")
+                cns.print(f"[bold]Replacing [blue]{str(root)}[/]  ⟶  [green]{str((new_file))}[/]")
                 printed=True
                 cns.print(f' ⇒ {ending}', end='')
 

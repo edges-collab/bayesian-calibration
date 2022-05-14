@@ -29,6 +29,7 @@ from scipy.stats import lognorm, norm
 import pickle
 from edges_cal.modelling import Polynomial, UnitTransform
 import git
+import inspect
 
 cns = Console(width=200)
 log = logging.getLogger(__name__)
@@ -38,11 +39,19 @@ main = click.Group()
 
 LABEL_FORMATS = (
     "smooth{smooth:02d}_tns{tns_width:04d}_ign[{ignore_sources}]_sim[{as_sim}]_s11{s11_sys}",
-    "smooth{smooth:02d}_tns{tns_width:04d}_ign[{ignore_sources}]_sim[{as_sim}]_s11{s11_sys}_nscale{nscale:02d}_ndelay{ndelay:02d}",
+    "smooth{smooth:02d}_tns{tns_width:04d}_ign[{ignore_sources}]_sim[{as_sim}]_s11{s11_sys}_nscale{nscale:02d}_ndelay{ndelay:02d}_unw-{unweighted}_cnf{cable_noise_factor:d}",
 )
 
 FOLDER = "alan_precal"
-DEFAULT_KWARGS = {'tns_width': 500, 'ignore_sources': (), 's11_sys': (), "nscale": 1, "ndelay": 1}
+DEFAULT_KWARGS = {
+    'tns_width': 500, 
+    'ignore_sources': (), 
+    's11_sys': (), 
+    "nscale": 1, 
+    "ndelay": 1, 
+    'unweighted': False, 
+    'cable_noise_factor': 1
+}
 
 def make_s11_sys(name, nscale, ndelay, scale_max, delay_max):
     out = dict(
@@ -63,14 +72,23 @@ def make_s11_sys(name, nscale, ndelay, scale_max, delay_max):
 def define_s11_systematics(s11_sys: tuple[str], nscale: int, ndelay: int, scale_max: float=1e-2, delay_max: float=10):
     s11_systematic_params = {}
     for src in s11_sys:
-        s11_systematic_params[src] = make_s11_sys(src, nscale=nscale, ndelay=ndelay, scale_max=scale_max, delay_max=delay_max),
+        s11_systematic_params[src] = make_s11_sys(src, nscale=nscale, ndelay=ndelay, scale_max=scale_max, delay_max=delay_max)
 
     return s11_systematic_params
 
-def get_likelihood(smooth, tns_width, est_tns=None, ignore_sources=(), as_sim=(), s11_sys=(), nscale=1, ndelay=1):
+def get_likelihood(
+    smooth, tns_width, est_tns=None, ignore_sources=(), as_sim=(), 
+    s11_sys=(), nscale=1, ndelay=1, unweighted=False, cable_noise_factor=1,
+):
     calobs = utils.get_calobs(cterms=6, wterms=5, smooth=smooth)
     s11_systematic_params = define_s11_systematics(s11_sys, nscale=nscale, ndelay=ndelay)
-    return utils.get_cal_lk(calobs, tns_width=tns_width, est_tns=est_tns, ignore_sources=ignore_sources, as_sim=as_sim, s11_systematic_params=s11_systematic_params)
+    return utils.get_cal_lk(
+        calobs, tns_width=tns_width, est_tns=est_tns, 
+        ignore_sources=ignore_sources, as_sim=as_sim, 
+        s11_systematic_params=s11_systematic_params,
+        sig_by_sigq=not unweighted, sig_by_tns=not unweighted,
+        cable_noise_factor=cable_noise_factor,
+    )
 
 
 def get_label(label_format=None, **kwargs):
@@ -81,38 +99,43 @@ def get_label(label_format=None, **kwargs):
 
 
 def get_kwargs(label: str) -> dict[str, Any]:
-    for fmt in LABEL_FORMATS[::-1]:
-        kw = parse.parse(fmt, label)
-        if kw:
-            kw = kw.named
-            break
-        else:
-            kw = {}
-
-    for k, v in kw.items():
-        # Convert booleans
-        if v in ("True", "False"):
-            kw[k] = (v == "True")
-
-        # Convert tuples of strings.    
-        if isinstance(v, str) and v[0] == '(' and v[-1] == ')':
-            if len(v)>2:
-                kw[k] = tuple(v[1:-1].replace("'", "").replace(' ','').split(','))
+    yaml_file = Path('outputs') / FOLDER / label / 'bayescal.lkargs.yaml'
+    if yaml_file.exists():
+        with open(FOLDER / label / 'bayescal.lkargs.yaml', 'r') as fl:
+            kw = yaml.safe_load(fl)
+    else:
+        for fmt in LABEL_FORMATS[::-1]:
+            kw = parse.parse(fmt, label)
+            if kw:
+                kw = kw.named
+                break
             else:
-                kw[k] = ()
+                kw = {}
+
+        for k, v in kw.items():
+            # Convert booleans
+            if v in ("True", "False"):
+                kw[k] = (v == "True")
+
+            # Convert tuples of strings.    
+            if isinstance(v, str) and v[0] == '(' and v[-1] == ')':
+                if len(v)>2:
+                    kw[k] = tuple(v[1:-1].replace("'", "").replace(' ','').split(','))
+                else:
+                    kw[k] = ()
 
     return {**DEFAULT_KWARGS, **kw}
 
 
 def get_samples_file(**kwargs):
-    return f"{FOLDER}/{get_label(**kwargs)}.txt"
+    return f"outputs/{FOLDER}/{get_label(**kwargs)}/bayescal.txt"
 
 
 def get_all_cal_curves(mcsamples, nthreads=1, force=False):
-    folder = FOLDER
-    kwargs = get_kwargs(Path(mcsamples.root).name)
+    folder = Path('outputs') / FOLDER
+    kwargs = get_kwargs(Path(mcsamples.root).parent.name)
     if force:
-        outfile = Path(folder) / (get_label(**kwargs) + "_blobs.npz")
+        outfile = folder / (get_label(**kwargs) / "bayescal_blobs.npz")
         log.warning(f"Overwriting {outfile} since force=True")
     
     else:
@@ -175,14 +198,20 @@ def get_all_cal_curves(mcsamples, nthreads=1, force=False):
     return out_dict
 
 
-def get_completed_cal_runs(read: bool = False):
-    pth = Path(FOLDER)
-    cal_runs = sorted(list({fl.with_suffix("") for fl in sorted(pth.glob("*.paramnames"))}))
+def get_completed_runs(read: bool = False):
+    pth = Path('outputs') / FOLDER
+
+    all_runs = [p for p in sorted(pth.glob('*'))]
+    
+    completed_runs = []
+    for run in all_runs:
+        if (run / 'bayescal.paramnames').exists():
+            completed_runs.append(run)
 
     if read:
-        return {fl.name: loadMCSamples(str(fl)) for fl in cal_runs}
+        return {fl.name: loadMCSamples(str(fl)) for fl in completed_runs}
     else:
-        return cal_runs
+        return completed_runs
 
 
 def get_recalibrated_src_temps(blobs, root, calobs, nthreads=1, force=False):
@@ -295,10 +324,8 @@ def get_recalibrated_src_temp_best(mcsamples, calobs, labcal):
 
 
 def run_lk(
-    lk,
-    label,
-    resume,
-    nlive_fac,
+    resume=False,
+    nlive_fac=100,
     clobber=False,
     raise_on_prior=True,
     optimize=True,
@@ -307,15 +334,26 @@ def run_lk(
     set_widths: bool=False,
     run_mcmc: bool=True,
     opt_iter: int = 10,
+    **lk_kwargs
 ):
-    root = 
-    folder = Path(FOLDER)
-    out_txt = folder / label /  + '.txt')
+    label = get_label(**lk_kwargs)
+    lk = get_likelihood(**lk_kwargs)
 
-    out_yaml = folder / (label + '.meta.yml')
+    repo = git.Repo(str(Path(__file__).parent.absolute()))
+
+    root = 'bayescal'
+    folder = Path('outputs') / FOLDER / label
+    out_txt = folder / (root + '.txt')
+    out_yaml = folder / (root + '.meta.yml')
 
     if mpi.am_single_or_primary_process:
+
+        if not folder.exists():
+            folder.mkdir(parents=True)
+
         cns.print(f"[bold]Running [blue]{label}")
+        cns.print(f"Output will go to '{folder}'")
+
         cns.print(
             f"[bold]Fiducial Parameters[/]: {[p.fiducial for p in lk.partial_linear_model.child_active_params]}"
         )
@@ -334,16 +372,19 @@ def run_lk(
                     f"Run with label '{label}' already exists. Use --resume to resume it, or delete it."
                 )
             else:
-                all_files = folder.glob(f"{label}*")
+                all_files = folder.glob(f"{root}*")
                 flstring = "\n\t".join(str(fl.name) for fl in all_files)
                 log.warning(f"Removing following files:\n{flstring}")
                 for fl in all_files:
                     fl.unlink()
 
-        
+        # Write out the likelihood args
+        with open(folder / (root + '.lkargs.yaml'), 'w') as fl:
+            yaml.dump(lk_kwargs, fl)
+
     if optimize and (not resume or not out_txt.exists() or not run_mcmc):
         # Only run the optimizatino if we're not just resuming an MCMC
-        lk = optimize_lk(lk, truth, prior_width,  folder, label, dual_annealing = optimize == 'dual_annealing', niter=opt_iter, set_widths=set_widths)
+        lk = optimize_lk(lk, truth, prior_width,  folder, root, dual_annealing = optimize == 'dual_annealing', niter=opt_iter, set_widths=set_widths)
         
 
     if mpi.am_single_or_primary_process:
@@ -356,7 +397,8 @@ def run_lk(
                 'start_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 'optimize': optimize,
                 'prior_width': prior_width,
-                'set_widths': set_widths
+                'set_widths': set_widths,
+                'githash': repo.head.ref.commit.hexsha + ('.dirty' if repo.is_dirty() else ''),
             }
 
             with open(out_yaml, 'w') as fl:
@@ -367,7 +409,7 @@ def run_lk(
             save_full_config=False,
             likelihood=lk.partial_linear_model,
             output_dir=folder,
-            output_prefix=label,
+            output_prefix=root,
             sampler_kwargs=dict(
                 nlive=nlive_fac * len(lk.partial_linear_model.child_active_params),
                 read_resume=resume,
@@ -423,7 +465,7 @@ def optimize_lk(lk, truth, prior_width, folder, label, dual_annealing: bool=Fals
         if dual_annealing:
             opt_res = run_map(
                 lk.partial_linear_model,
-                dual_annealing_kw={"niter": niter, "callback": callback},
+                dual_annealing_kw={"maxiter": niter, "callback": callback},
             )
         else:
             opt_res = run_map(
@@ -431,15 +473,15 @@ def optimize_lk(lk, truth, prior_width, folder, label, dual_annealing: bool=Fals
                 basinhopping_kw={"niter": niter, "callback": callback},
             )
 
-        if opt_res.minimization_failures > 0:
-            log.warning(
-                    f"There were {opt_res.minimization_failures} minimization failures!"
-                )
+            if opt_res.minimization_failures > 0:
+                log.warning(
+                        f"There were {opt_res.minimization_failures} minimization failures!"
+                    )
 
-        if not opt_res.lowest_optimization_result.success:
-            log.warning(
-                    f"The lowest optimization was not successful! Message: {opt_res.lowest_optimization_result.message}"
-                )
+            if not opt_res.lowest_optimization_result.success:
+                log.warning(
+                        f"The lowest optimization was not successful! Message: {opt_res.lowest_optimization_result.message}"
+                    )
 
         def obj(x):
             out = -lk.partial_linear_model.logp(params=x)
@@ -450,7 +492,7 @@ def optimize_lk(lk, truth, prior_width, folder, label, dual_annealing: bool=Fals
         
         cns.print("Computing Hessian...")
 
-        hess = Hessian(obj)(opt_res.x)
+        hess = Hessian(obj, base_step=0.1, step_ratio=3, num_steps=30)(opt_res.x)
         cns.print("Hessian: ", hess)
         cov = np.linalg.inv(hess)
         cns.print("Covariance: ", cov)
@@ -494,7 +536,8 @@ def optimize_lk(lk, truth, prior_width, folder, label, dual_annealing: bool=Fals
                     'optres': opt_res,
                     'cov': cov,
                     'minima': minima,
-                }
+                },
+                fl
             )
 
     else:
@@ -528,24 +571,11 @@ def optimize_lk(lk, truth, prior_width, folder, label, dual_annealing: bool=Fals
     return lk
 
 
-def run_single(
-    label, resume, nlive_fac, label_kwargs, est_tns=None, **kwargs
-):
-    if label is None:
-        label = get_label(**label_kwargs)
-
-    if mpi.am_single_or_primary_process:
-        cns.print(f"Output will go to '{FOLDER}/{label}'")
-    lk = get_likelihood(est_tns=est_tns, **label_kwargs)
-    run_lk(lk, label, resume, nlive_fac, run_mcmc=run_mcmc, **kwargs)
-
-
 class MCMCBoundsError(ValueError):
     pass
 
 
 @main.command()
-@click.option("-l", "--label", default=None, type=str)
 @click.option("--resume/--no-resume", default=False)
 @click.option("-s", "--smooth", default=8)
 @click.option("-p", "--tns-width", default=500)
@@ -554,60 +584,79 @@ class MCMCBoundsError(ValueError):
 @click.option("--clobber/--no-clobber", default=False)
 @click.option("--set-widths/--no-set-widths", default=False)
 @click.option("--tns-mean-zero/--est-tns", default=True)
-@click.option('--ignore', multiple=True, type=click.Choice(['short', 'open','hot_load', 'ambient']))
+@click.option('--ignore-sources', multiple=True, type=click.Choice(['short', 'open','hot_load', 'ambient']))
 @click.option('--as-sim', multiple=True, type=click.Choice(['short', 'open', 'hot_load', 'ambient']))
 @click.option("--log-level", default='info', type=click.Choice(['info', 'debug', 'warn', 'error']))
-@click.option("--s11-model", multiple=True, type=click.Choice(['short', 'open', 'hot_load', 'ambient', 'rcv']))
-@click.option("--s11-uniform/--s11-lognorm", default=False)
+@click.option("--s11-sys", multiple=True, type=click.Choice(['short', 'open', 'hot_load', 'ambient', 'rcv']))
 @click.option("--run-mcmc/--no-mcmc", default=True)
 @click.option("--opt-iter", default=10)
+@click.option("--unweighted/--weighted", default=False)
+@click.option("--cable-noise-factor", default=1, type=int)
+@click.option("--ndelay", default=1, type=int)
+@click.option("--nscale", default=1, type=int)
 def run(
-    label,
-    resume,
-    smooth,
-    tns_width,
-    nlive_fac,
-    clobber,
-    optimize,
-    set_widths,
-    tns_mean_zero,
-    ignore,
-    as_sim,
-    log_level,
-    s11_model,
-    s11_uniform,
-    run_mcmc,
-    opt_iter,
+    # resume,
+    # smooth,
+    # tns_width,
+    # nlive_fac,
+    # clobber,
+    # optimize,
+    # set_widths,
+    # tns_mean_zero,
+    # ignore,
+    # as_sim,
+    # log_level,
+    # s11_model,
+    # run_mcmc,
+    # opt_iter,
+    # unweighted,
+    # cable_noise_factor,
+    # ndelay,
+    # nscale,
+    **kwargs
 ):
+    # lc = locals()
+    # sig = inspect.signature(run)
+    # kwargs = {k: lc[k] for k in sig}
 
+    # lk_kwargs = {
+    #     'smooth': smooth,
+    #     'tns_width': tns_width,
+    #     'ignore_sources': ignore,
+    #     'as_sim': as_sim,
+    #     's11_sys': tuple(s11_model),
+    #     'unweighted': unweighted,
+    #     'cable_noise_factor': cable_noise_factor,
+    #     'ndelay': ndelay
+    # }
+
+
+    clirun(**kwargs)
+
+
+def clirun(**kwargs):
+    log_level = kwargs.pop("log_level")
     root_logger = logging.getLogger('yabf')
     root_logger.setLevel(log_level.upper())
     root_logger.addHandler(RichHandler(rich_tracebacks=True, console=cns))
     
-    optimize = optimize.lower()
+    optimize = kwargs.pop('optimize').lower()
 
     if optimize == 'none':
         optimize = None
 
-    run_single(
-        label,
-        resume,
-        label_kwargs = {
-            'smooth': smooth,
-            'tns_width': tns_width,
-            'ignore_sources': ignore,
-            'as_sim': as_sim,
-            's11_sys': tuple(s11_model),
-            's11_unif_prior': s11_uniform
-        },
-        nlive_fac=nlive_fac,
-        clobber=clobber,
+    tns_mean_zero = kwargs.pop('tns_mean_zero')
+    
+    for k, v in kwargs.items():
+        if isinstance(v, list):
+            kwargs[k] = tuple(v)
+
+    run_lk(
         optimize=optimize,
-        set_widths=set_widths,
         est_tns=np.zeros(6) if tns_mean_zero else None,
-        run_mcmc=run_mcmc,
-        opt_iter=opt_iter,
+        **kwargs
     )
+
 
 
 if __name__ == "__main__":
