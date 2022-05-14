@@ -101,12 +101,15 @@ def get_label(label_format=None, **kwargs):
     label_format = label_format or LABEL_FORMATS[-1]
     return label_format.format(s11_sys=s11_sys, **kwargs)
 
+def get_likelihood_from_label(label: str):
+    kw = get_kwargs(label)
+    return get_likelihood(**kw)
 
 def get_kwargs(label: str) -> dict[str, Any]:
     yaml_file = Path('outputs') / FOLDER / label / 'bayescal.lkargs.yaml'
     if yaml_file.exists():
-        with open(FOLDER / label / 'bayescal.lkargs.yaml', 'r') as fl:
-            kw = yaml.safe_load(fl)
+        with open(yaml_file, 'r') as fl:
+            kw = yaml.load(fl, Loader=yaml.UnsafeLoader)
     else:
         for fmt in LABEL_FORMATS[::-1]:
             kw = parse.parse(fmt, label)
@@ -462,92 +465,102 @@ def run_lk(
 
 def optimize_lk(lk, truth, prior_width, folder, label, dual_annealing: bool=False, niter: int=10, set_widths=False):
     if mpi.am_single_or_primary_process:
-        cns.print(f"Optimizing with {niter} global iterations using {'dual_annealing' if dual_annealing else 'basinhopping'}...", end='')
-        t = time.time()
-
-        minima = []
-
-        def callback(x, f, accept):
-            minima.append((x, f))
-
-        if dual_annealing:
-            opt_res = run_map(
-                lk.partial_linear_model,
-                dual_annealing_kw={"maxiter": niter, "callback": callback},
-            )
-        else:
-            opt_res = run_map(
-                lk.partial_linear_model,
-                basinhopping_kw={"niter": niter, "callback": callback},
-            )
-
-            if opt_res.minimization_failures > 0:
-                log.warning(
-                        f"There were {opt_res.minimization_failures} minimization failures!"
-                    )
-
-            if not opt_res.lowest_optimization_result.success:
-                log.warning(
-                        f"The lowest optimization was not successful! Message: {opt_res.lowest_optimization_result.message}"
-                    )
-
-        def obj(x):
-            out = -lk.partial_linear_model.logp(params=x)
-            # cns.print(x, out)
-            if np.isnan(out) or np.isinf(out):
-                log.warning(f"Hessian got NaN/inf value for parameters: {x}, {out}")
-            return out
-        
-        cns.print("Computing Hessian...")
-
-        hess = Hessian(obj, base_step=0.1, step_ratio=3, num_steps=30)(opt_res.x)
-        cns.print("Hessian: ", hess)
-        cov = np.linalg.inv(hess)
-        cns.print("Covariance: ", cov)
-        std = np.sqrt(np.diag(cov))
-        widths = prior_width * std
-        resx = opt_res.x
-
-        cns.print("[bold]Estimated Parameters: [/]")
-        for p, r, s in zip(lk.partial_linear_model.child_active_params, resx, std):
-            cns.print(f"\t{p.name:>14}: {r:1.3e} +- {s:1.3e}")
-
-        f = [f for _, f in minima]
-        minf = min(f)
-        _minima = [m for m in minima if m[1] < (minf + 100)]
-
-        if len(_minima) == 1:
-            log.warning(f"Only one minima was any good, got: {f}")
-        else:
-            for i, param in enumerate(lk.partial_linear_model.child_active_params):
-                rxx = resx[i]
-                ww = widths[i]
-
-                xx  = [x[i] for x, _ in _minima]
+        outfile = folder / (label + '.map')
+        if outfile.exists():
+            cns.print("Getting previously run optimization.")
+            with open(outfile, 'rb') as fl:
+                d = pickle.load(fl)
                 
-                if any((np.abs(xxx - rxx) > ww and (ff < minf + 100)) for xxx, ff in zip(xx, f)):
-                    log.error(
-                        f"For '{param.name}', got minima at {xx} "
-                        f"when it should have been between {rxx-ww} and {rxx+ww}."
-                        f"Corresponding -lks: {[f for _, f in _minima]} (high likelihoods omitted)."
-                    )
-                    
-        if truth is not None and np.any(np.abs(truth - resx) > 3 * std):
-            raise RuntimeError(
-                    "At least one of the estimated parameters was off the truth by > 3σ"
-                )
-        cns.print(f" done in {time.time() - t:.2f} seconds.")
+            resx = d['optres'].x
+            widths = np.sqrt(np.diag(d['cov'])) * prior_width
 
-        # Write out the results in a pickle.
-        with open(folder / (label + '.map'), 'wb') as fl:
-            pickle.dump(
-                {
-                    'optres': opt_res,
-                    'cov': cov,
-                    'minima': minima,
-                },
-                fl
-            )
+        else:
+            cns.print(f"Optimizing with {niter} global iterations using {'dual_annealing' if dual_annealing else 'basinhopping'}...", end='')
+            t = time.time()
+
+            minima = []
+
+            def callback(x, f, accept):
+                minima.append((x, f))
+
+            if dual_annealing:
+                opt_res = run_map(
+                    lk.partial_linear_model,
+                    dual_annealing_kw={"maxiter": niter, "callback": callback},
+                )
+            else:
+                opt_res = run_map(
+                    lk.partial_linear_model,
+                    basinhopping_kw={"niter": niter, "callback": callback},
+                )
+
+                if opt_res.minimization_failures > 0:
+                    log.warning(
+                            f"There were {opt_res.minimization_failures} minimization failures!"
+                        )
+
+                if not opt_res.lowest_optimization_result.success:
+                    log.warning(
+                            f"The lowest optimization was not successful! Message: {opt_res.lowest_optimization_result.message}"
+                        )
+
+            def obj(x):
+                out = -lk.partial_linear_model.logp(params=x)
+                # cns.print(x, out)
+                if np.isnan(out) or np.isinf(out):
+                    log.warning(f"Hessian got NaN/inf value for parameters: {x}, {out}")
+                return out
+            
+            cns.print("Computing Hessian...")
+
+            hess = Hessian(obj, base_step=0.1, step_ratio=3, num_steps=30)(opt_res.x)
+            cns.print("Hessian: ", hess)
+            cov = np.linalg.inv(hess)
+            cns.print("Covariance: ", cov)
+            std = np.sqrt(np.diag(cov))
+            widths = prior_width * std
+            resx = opt_res.x
+
+            cns.print("[bold]Estimated Parameters: [/]")
+            for p, r, s in zip(lk.partial_linear_model.child_active_params, resx, std):
+                cns.print(f"\t{p.name:>14}: {r:1.3e} +- {s:1.3e}")
+
+            f = [f for _, f in minima]
+            minf = min(f)
+            _minima = [m for m in minima if m[1] < (minf + 100)]
+
+            if len(_minima) == 1:
+                log.warning(f"Only one minima was any good, got: {f}")
+            else:
+                for i, param in enumerate(lk.partial_linear_model.child_active_params):
+                    rxx = resx[i]
+                    ww = widths[i]
+
+                    xx  = [x[i] for x, _ in _minima]
+                    
+                    if any((np.abs(xxx - rxx) > ww and (ff < minf + 100)) for xxx, ff in zip(xx, f)):
+                        log.error(
+                            f"For '{param.name}', got minima at {xx} "
+                            f"when it should have been between {rxx-ww} and {rxx+ww}."
+                            f"Corresponding -lks: {[f for _, f in _minima]} (high likelihoods omitted)."
+                        )
+                        
+            if truth is not None and np.any(np.abs(truth - resx) > 3 * std):
+                raise RuntimeError(
+                        "At least one of the estimated parameters was off the truth by > 3σ"
+                    )
+            cns.print(f" done in {time.time() - t:.2f} seconds.")
+
+            # Write out the results in a pickle.
+            with open(outfile, 'wb') as fl:
+                pickle.dump(
+                    {
+                        'optres': opt_res,
+                        'cov': cov,
+                        'minima': minima,
+                    },
+                    fl
+                )
 
     else:
         resx = None
