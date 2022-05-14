@@ -29,7 +29,11 @@ from scipy.stats import lognorm, norm
 import pickle
 from edges_cal.modelling import Polynomial, UnitTransform
 import git
-import inspect
+import edges_io
+import edges_cal
+import edges_analysis
+import edges_estimate
+
 
 cns = Console(width=200)
 log = logging.getLogger(__name__)
@@ -399,6 +403,10 @@ def run_lk(
                 'prior_width': prior_width,
                 'set_widths': set_widths,
                 'githash': repo.head.ref.commit.hexsha + ('.dirty' if repo.is_dirty() else ''),
+                'edges-io': edges_io.__version__,
+                'edges-cal': edges_cal.__version__,
+                'edges-analysis': edges_analysis.__version__,
+                'edges-estimate': edges_estimate.__version__,
             }
 
             with open(out_yaml, 'w') as fl:
@@ -595,42 +603,8 @@ class MCMCBoundsError(ValueError):
 @click.option("--ndelay", default=1, type=int)
 @click.option("--nscale", default=1, type=int)
 def run(
-    # resume,
-    # smooth,
-    # tns_width,
-    # nlive_fac,
-    # clobber,
-    # optimize,
-    # set_widths,
-    # tns_mean_zero,
-    # ignore,
-    # as_sim,
-    # log_level,
-    # s11_model,
-    # run_mcmc,
-    # opt_iter,
-    # unweighted,
-    # cable_noise_factor,
-    # ndelay,
-    # nscale,
     **kwargs
 ):
-    # lc = locals()
-    # sig = inspect.signature(run)
-    # kwargs = {k: lc[k] for k in sig}
-
-    # lk_kwargs = {
-    #     'smooth': smooth,
-    #     'tns_width': tns_width,
-    #     'ignore_sources': ignore,
-    #     'as_sim': as_sim,
-    #     's11_sys': tuple(s11_model),
-    #     'unweighted': unweighted,
-    #     'cable_noise_factor': cable_noise_factor,
-    #     'ndelay': ndelay
-    # }
-
-
     clirun(**kwargs)
 
 
