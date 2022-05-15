@@ -23,8 +23,6 @@ def get_evidence(root: str) -> float:
 
 def get_all_files(direc, running_only: bool, complete_only: bool, glob=(), exc_glob=()) -> tuple[dict[str, Path], set[Path]]:
     direc = Path(direc)
-
-    suffix = '.paramnames' if complete_only else '.stats'
     
     runs = set()
 
@@ -33,17 +31,17 @@ def get_all_files(direc, running_only: bool, complete_only: bool, glob=(), exc_g
 
     for gl in glob:
         gl = f"*{gl}*" if gl else '*'
-        runs.update({fl.with_suffix("") for fl in direc.glob(gl+suffix)})
+        runs.update({fl for fl in direc.glob(gl)})
 
     for gl in exc_glob:
         runs = {r for r in runs if gl not in str(r)}
 
-    completed = {fl for fl in runs if fl.with_suffix('.paramnames').exists()}
+    completed = {fl for fl in runs if (fl / 'bayescal.paramnames').exists()}
 
     if running_only:
         runs = {fl for fl in runs if fl not in completed}
 
-    return {fl.with_suffix('').name: fl for fl in runs}, completed
+    return {fl.name: fl for fl in runs}, completed
     
 
 @main.command()
@@ -58,7 +56,7 @@ def show(direc, running_only: bool, complete_only: bool, show_evidence: bool, gl
 
     names, completed = get_all_files(direc, running_only, complete_only, glob, exc_glob)
 
-    evidence = {name: get_evidence(str(fl.parent / name)) for name, fl in names.items() if fl in completed}
+    evidence = {name: get_evidence(str(fl / 'bayescal')) for name, fl in names.items() if fl in completed}
 
     cns.print(f"[bold]Runs for {direc}:[/]")
 
@@ -69,7 +67,7 @@ def show(direc, running_only: bool, complete_only: bool, show_evidence: bool, gl
         else:
             cns.print("[red](Still Running...)[/]", end='\t')
 
-        mod_time = datetime.fromtimestamp(fl.with_suffix('.txt').stat().st_mtime)
+        mod_time = datetime.fromtimestamp((fl/'bayescal.txt').stat().st_mtime)
         cns.print(mod_time.strftime('%Y-%m-%d %H:%M'))
 
 
