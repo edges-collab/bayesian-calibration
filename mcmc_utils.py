@@ -58,19 +58,27 @@ def show(direc, running_only: bool, complete_only: bool, show_evidence: bool, gl
 
     evidence = {name: get_evidence(str(fl / 'bayescal')) for name, fl in names.items() if fl in completed}
 
+    nlongest = max(len(name) for name in names)
+
     cns.print(f"[bold]Runs for {direc}:[/]")
 
     for name, fl in sorted(names.items()):
-        cns.print(f"[blue]{name}[/]\t", end="")
+        cns.print(f"[blue]{name:>{nlongest}}[/]\t", end="")
         if name in evidence:
             cns.print(f"lnZ={evidence[name]:.1f}", end='\t')
+            mod_time = datetime.fromtimestamp((fl/'bayescal.txt').stat().st_mtime)
+            cns.print(mod_time.strftime('%Y-%m-%d %H:%M'))
+
         elif (fl/'bayescal.txt').exists():
             cns.print("[red](Still Running...)[/]", end='\t')
 
             mod_time = datetime.fromtimestamp((fl/'bayescal.txt').stat().st_mtime)
             cns.print(mod_time.strftime('%Y-%m-%d %H:%M'))
         else:
-            cns.print("[red](Only optimized...[/]", end='\t')
+            mod_time = datetime.fromtimestamp((fl/'bayescal.map').stat().st_mtime)
+            cns.print(mod_time.strftime('%Y-%m-%d %H:%M'))
+
+            cns.print("[red](Only optimized...)[/]\t{mod_time.strftime('%Y-%m-%d %H:%M')}")
 
 @main.command()
 @click.argument('direc', type=click.Path(exists=True, file_okay=False))
