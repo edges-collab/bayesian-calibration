@@ -64,12 +64,13 @@ def show(direc, running_only: bool, complete_only: bool, show_evidence: bool, gl
         cns.print(f"[blue]{name}[/]\t", end="")
         if name in evidence:
             cns.print(f"lnZ={evidence[name]:.1f}", end='\t')
-        else:
+        elif (fl/'bayescal.txt').exists():
             cns.print("[red](Still Running...)[/]", end='\t')
 
-        mod_time = datetime.fromtimestamp((fl/'bayescal.txt').stat().st_mtime)
-        cns.print(mod_time.strftime('%Y-%m-%d %H:%M'))
-
+            mod_time = datetime.fromtimestamp((fl/'bayescal.txt').stat().st_mtime)
+            cns.print(mod_time.strftime('%Y-%m-%d %H:%M'))
+        else:
+            cns.print("[red](Only optimized...[/]", end='\t')
 
 @main.command()
 @click.argument('direc', type=click.Path(exists=True, file_okay=False))
