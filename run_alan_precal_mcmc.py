@@ -205,22 +205,6 @@ def get_all_cal_curves(mcsamples, nthreads=1, force=False):
     return out_dict
 
 
-def get_completed_runs(read: bool = False):
-    pth = Path('outputs') / FOLDER
-
-    all_runs = [p for p in sorted(pth.glob('*'))]
-    
-    completed_runs = []
-    for run in all_runs:
-        if (run / 'bayescal.paramnames').exists():
-            completed_runs.append(run)
-
-    if read:
-        return {fl.name: loadMCSamples(str(fl)) for fl in completed_runs}
-    else:
-        return completed_runs
-
-
 def get_recalibrated_src_temps(blobs, root, calobs, nthreads=1, force=False):
     if Path(root+"_src_temps.npz").exists() and not force:
         return np.load(root+ "_src_temps.npz")
@@ -438,7 +422,7 @@ def run_lk(
         time_dumper.last_call = t
         samples = poly.sample(dumper=time_dumper)
         cns.print(f"Sampling took {(time.time() - t)/60/60:1.3} hours.")
-        samples.saveAsText(f"{folder}/{label}")
+        samples.saveAsText(f"{folder}/{root}")
 
         if mpi.am_single_or_primary_process:
             yaml_args['end_time'] = t

@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 from datetime import datetime
 import importlib
+from getdist import loadMCSamples
 
 cns = Console(width=200)
 log = logging.getLogger(__name__)
@@ -44,6 +45,19 @@ def get_all_files(direc, running_only: bool, complete_only: bool, glob=(), exc_g
     return {fl.name: fl for fl in runs}, completed
     
 
+def get_completed_mcsamples(folder):
+    pth = Path('outputs') / folder
+
+    all_runs = [p for p in sorted(pth.glob('*'))]
+    
+    completed_runs = []
+    for run in all_runs:
+        if (run / 'bayescal.paramnames').exists():
+            completed_runs.append(run / 'bayescal')
+
+    return {fl.parent.name: loadMCSamples(str(fl)) for fl in completed_runs}
+
+
 @main.command()
 @click.argument('direc', type=click.Path(exists=True, file_okay=False))
 @click.option("--running-only/--not-running-only", default=False, help="Only show MCMCs that are still running.")
@@ -76,9 +90,7 @@ def show(direc, running_only: bool, complete_only: bool, show_evidence: bool, gl
             cns.print(mod_time.strftime('%Y-%m-%d %H:%M'))
         else:
             mod_time = datetime.fromtimestamp((fl/'bayescal.map').stat().st_mtime)
-            cns.print(mod_time.strftime('%Y-%m-%d %H:%M'))
-
-            cns.print("[red](Only optimized...)[/]\t{mod_time.strftime('%Y-%m-%d %H:%M')}")
+            cns.print(f"[red](Only optimized...)[/]\t{mod_time.strftime('%Y-%m-%d %H:%M')}")
 
 @main.command()
 @click.argument('direc', type=click.Path(exists=True, file_okay=False))
