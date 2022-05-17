@@ -28,21 +28,14 @@ precal.LABEL_FORMATS = (
     "c{cterms:02d}_w{wterms:02d}_smooth{smooth:02d}_tns{tns_width:04d}_ign[{ignore_sources}]_sim[{as_sim}]",
     "c{cterms:02d}_w{wterms:02d}_smooth{smooth:02d}_tns{tns_width:04d}_ign[{ignore_sources}]_sim[{as_sim}]_s11{s11_sys}",
     "c{cterms:02d}_w{wterms:02d}_smooth{smooth:02d}_tns{tns_width:04d}_ign[{ignore_sources}]_sim[{as_sim}]_s11{s11_sys}_antsim-{antsim}",
+    "c{cterms:02d}_w{wterms:02d}_cf{fit_cterms:02d}_wf{fit_wterms:02d}_smooth{smooth:02d}_tns{tns_width:04d}_ign[{ignore_sources}]_sim[{as_sim}]_s11{s11_sys}_antsim-{antsim}",
 )
 precal.FOLDER = "alan_cal"
 precal.DEFAULT_KWARGS['antsim'] = False
 
 get_kwargs = precal.get_kwargs
 get_label = precal.get_label
-
-def get_likelihood(cterms, wterms, smooth, tns_width, est_tns=None, ignore_sources=(), as_sim=(), s11_sys=(), antsim=False):
-    s11_systematic_params = precal.define_s11_systematics(s11_sys)
-    
-    calobs = utils.get_calobs(cterms=cterms, wterms=wterms, smooth=smooth)
-
-    return utils.get_cal_lk(calobs, tns_width=tns_width, est_tns=est_tns, ignore_sources=ignore_sources, as_sim=as_sim, s11_systematic_params=s11_systematic_params, include_antsim=antsim)
-
-precal.get_likelihood = get_likelihood
+get_likelihood = precal.get_likelihood
 
 class MCMCBoundsError(ValueError):
     pass
@@ -50,6 +43,8 @@ class MCMCBoundsError(ValueError):
 @main.command()
 @click.option("-c", "--cterms", default=6)
 @click.option("-w", "--wterms", default=5)
+@click.option("--fit-cterms", default=6)
+@click.option("--fit-wterms", default=5)
 @click.option("--resume/--no-resume", default=False)
 @click.option("-s", "--smooth", default=1)
 @click.option("-p", "--tns-width", default=3)

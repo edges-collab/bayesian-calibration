@@ -84,7 +84,7 @@ def get_likelihood(
     smooth, tns_width, est_tns=None, ignore_sources=(), as_sim=(), 
     s11_sys=(), nscale=1, ndelay=1, unweighted=False, cable_noise_factor=1,
     fit_cterms=None, fit_wterms=None, cterms=6, wterms=5, seed=1234, variance='data',
-    add_noise=True,
+    add_noise=True, antsim=False
 ):
     calobs = utils.get_calobs(cterms=cterms, wterms=wterms, smooth=smooth)
     s11_systematic_params = define_s11_systematics(s11_sys, nscale=nscale, ndelay=ndelay)
@@ -94,7 +94,7 @@ def get_likelihood(
         s11_systematic_params=s11_systematic_params,
         sig_by_sigq=not unweighted, sig_by_tns=not unweighted,
         cable_noise_factor=cable_noise_factor, cterms=fit_cterms, wterms=fit_wterms,
-        seed=seed, add_noise=add_noise,
+        seed=seed, add_noise=add_noise, include_antsim=antsim
     )
 
 
@@ -476,6 +476,8 @@ def optimize_lk(lk, truth, prior_width, folder, label, dual_annealing: bool=Fals
                     lk.partial_linear_model,
                     dual_annealing_kw={"maxiter": niter, "callback": callback},
                 )
+                if not opt_res.success:
+                    log.warning(f"Optimization unsuccessful with message: {opt_res.message}")
             else:
                 opt_res = run_map(
                     lk.partial_linear_model,
@@ -512,25 +514,26 @@ def optimize_lk(lk, truth, prior_width, folder, label, dual_annealing: bool=Fals
             widths = prior_width * std
             resx = opt_res.x
 
-            f = [f for _, f in minima]
-            minf = min(f)
-            _minima = [m for m in minima if m[1] < (minf + 100)]
+            if minima:
+                f = [f for _, f in minima]
+                minf = min(f)
+                _minima = [m for m in minima if m[1] < (minf + 100)]
 
-            if len(_minima) == 1:
-                log.warning(f"Only one minima was any good, got: {f}")
-            else:
-                for i, param in enumerate(lk.partial_linear_model.child_active_params):
-                    rxx = resx[i]
-                    ww = widths[i]
+                if len(_minima) == 1:
+                    log.warning(f"Only one minima was any good, got: {f}")
+                else:
+                    for i, param in enumerate(lk.partial_linear_model.child_active_params):
+                        rxx = resx[i]
+                        ww = widths[i]
 
-                    xx  = [x[i] for x, _ in _minima]
-                    
-                    if any((np.abs(xxx - rxx) > ww and (ff < minf + 100)) for xxx, ff in zip(xx, f)):
-                        log.error(
-                            f"For '{param.name}', got minima at {xx} "
-                            f"when it should have been between {rxx-ww} and {rxx+ww}."
-                            f"Corresponding -lks: {[f for _, f in _minima]} (high likelihoods omitted)."
-                        )
+                        xx  = [x[i] for x, _ in _minima]
+                        
+                        if any((np.abs(xxx - rxx) > ww and (ff < minf + 100)) for xxx, ff in zip(xx, f)):
+                            log.error(
+                                f"For '{param.name}', got minima at {xx} "
+                                f"when it should have been between {rxx-ww} and {rxx+ww}."
+                                f"Corresponding -lks: {[f for _, f in _minima]} (high likelihoods omitted)."
+                            )
                         
             if truth is not None and np.any(np.abs(truth - resx) > 3 * std):
                 raise RuntimeError(
