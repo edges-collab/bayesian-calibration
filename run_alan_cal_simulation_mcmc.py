@@ -1,20 +1,17 @@
 import click
-from alan_data_utils import get_likelihood
-import simulation_exploration_utils as utils
-from run_alan_cal_mcmc import run_lk
 from typing import Any
 import run_alan_precal_mcmc as precal
 
 main = click.Group()
 from functools import partial
 
-LABEL_FORMATS = (
-    "c{cterms:d}_w{wterms:d}_cf{cterms_fit:d}_wf{wterms_fit:d}_smooth{smooth:d}_tns{tns_width:d}_var-{variance}_s11{s11_sys}_nscale{nscale:02d}_ndelay{ndelay:02d}",
+precal.LABEL_FORMATS = (
+    "c{cterms:d}_w{wterms:d}_cf{fit_cterms:d}_wf{fit_wterms:d}_smooth{smooth:d}_tns{tns_width:d}_var-{variance}_s11{s11_sys}_nscale{nscale:02d}_ndelay{ndelay:02d}_noise{add_noise}",
 )
-FOLDER = "sim_cal_chains"
+precal.FOLDER = "alan_cal_simulation"
 
 get_label = precal.get_label
-get_likelihood = partial(precal.get_likelihood, as_sim=('hot_load', 'ambient', 'short', 'open'))    
+precal.get_likelihood = partial(precal.get_likelihood, as_sim=('hot_load', 'ambient', 'short', 'open'))
 
 def get_kwargs(label: str) -> dict[str, Any]:
     out = precal.get_kwargs(label)
@@ -24,6 +21,10 @@ def get_kwargs(label: str) -> dict[str, Any]:
 
 
 @main.command()
+@click.option("-c", "--cterms", default=6)
+@click.option("-w", "--wterms", default=5)
+@click.option("--fit-cterms", default=6)
+@click.option("--fit-wterms", default=5)
 @click.option("--resume/--no-resume", default=False)
 @click.option("-s", "--smooth", default=8)
 @click.option("-p", "--tns-width", default=500)
@@ -39,6 +40,8 @@ def get_kwargs(label: str) -> dict[str, Any]:
 @click.option("--opt-iter", default=10)
 @click.option("--ndelay", default=1, type=int)
 @click.option("--nscale", default=1, type=int)
+@click.option("--variance", default='data')
+@click.option("--add-noise/--no-noise", default=True)
 def run(
     **kwargs
 ):

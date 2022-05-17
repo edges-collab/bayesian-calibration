@@ -210,7 +210,7 @@ def decalibrate(labcal, f_sky, t_sky):
 def get_cal_lk(calobs, tns_width=500, est_tns=None, ignore_sources=(), as_sim=(), **kwargs):
     return NoiseWaveLikelihood.from_calobs(
         calobs,
-        t_ns_params=get_tns_params(calobs, tns_width=tns_width, est_tns=est_tns),
+        t_ns_params=get_tns_params(calobs, tns_width=tns_width, est_tns=est_tns, cterms=kwargs.get('cterms', None)),
         derived=(
             "logdet_cinv",
             "logdet_sig",
@@ -256,9 +256,10 @@ def get_var_q(fsky, qant, n_terms=25) -> np.ndarray:
     return np.ones_like(qant) * np.var(fit.residual)  # the value for 25 terms.
 
 
-def get_tns_params(calobs, tns_width=100, est_tns=None):
+def get_tns_params(calobs, tns_width=100, est_tns=None, cterms=None):
     # has to be an actual calobs
     assert isinstance(calobs, CalibrationObservation)
+    cterms = cterms or calobs.cterms
 
     zero = est_tns is not None and np.all(est_tns == 0)
 
@@ -271,9 +272,17 @@ def get_tns_params(calobs, tns_width=100, est_tns=None):
     else:
         mean = est_tns
 
+    if len(est_tns) < cterms:
+        est_tns = np.concatenate((est_tns, [0]*(cterms - len(est_tns))))
+        mean = np.concatenate((mean, [0]*(cterms - len(mean))))
+    elif len(est_tns) > cterms:
+        est_tns = est_tns[:cterms]
+        mean = mean[:cterms]
+
+    print(cterms, len(est_tns), len(mean))
     return ParamVec(
         "t_lns",
-        length=calobs.cterms,
+        length=cterms,
         min=mean - tns_width,
         max=mean + tns_width,
         fiducial=est_tns,

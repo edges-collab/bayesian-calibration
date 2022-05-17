@@ -83,15 +83,18 @@ def define_s11_systematics(s11_sys: tuple[str], nscale: int, ndelay: int, scale_
 def get_likelihood(
     smooth, tns_width, est_tns=None, ignore_sources=(), as_sim=(), 
     s11_sys=(), nscale=1, ndelay=1, unweighted=False, cable_noise_factor=1,
+    fit_cterms=None, fit_wterms=None, cterms=6, wterms=5, seed=1234, variance='data',
+    add_noise=True,
 ):
-    calobs = utils.get_calobs(cterms=6, wterms=5, smooth=smooth)
+    calobs = utils.get_calobs(cterms=cterms, wterms=wterms, smooth=smooth)
     s11_systematic_params = define_s11_systematics(s11_sys, nscale=nscale, ndelay=ndelay)
     return utils.get_cal_lk(
         calobs, tns_width=tns_width, est_tns=est_tns, 
         ignore_sources=ignore_sources, as_sim=as_sim, 
         s11_systematic_params=s11_systematic_params,
         sig_by_sigq=not unweighted, sig_by_tns=not unweighted,
-        cable_noise_factor=cable_noise_factor,
+        cable_noise_factor=cable_noise_factor, cterms=fit_cterms, wterms=fit_wterms,
+        seed=seed, add_noise=add_noise,
     )
 
 
@@ -456,7 +459,8 @@ def optimize_lk(lk, truth, prior_width, folder, label, dual_annealing: bool=Fals
                 d = pickle.load(fl)
                 
             resx = d['optres'].x
-            widths = np.sqrt(np.diag(d['cov'])) * prior_width
+            std = np.sqrt(np.diag(d['cov']))
+            widths =  std * prior_width
 
         else:
             cns.print(f"Optimizing with {niter} global iterations using {'dual_annealing' if dual_annealing else 'basinhopping'}...", end='')
@@ -498,16 +502,15 @@ def optimize_lk(lk, truth, prior_width, folder, label, dual_annealing: bool=Fals
             cns.print("Computing Hessian...")
 
             hess = Hessian(obj, base_step=0.1, step_ratio=3, num_steps=30)(opt_res.x)
-            cns.print("Hessian: ", hess)
+            cns.print("[bold]Hessian: ")
+            cns.print(hess)
+
             cov = np.linalg.inv(hess)
-            cns.print("Covariance: ", cov)
+            cns.print("[bold]Covariance: ")
+            cns.print(cov)
             std = np.sqrt(np.diag(cov))
             widths = prior_width * std
             resx = opt_res.x
-
-            cns.print("[bold]Estimated Parameters: [/]")
-            for p, r, s in zip(lk.partial_linear_model.child_active_params, resx, std):
-                cns.print(f"\t{p.name:>14}: {r:1.3e} +- {s:1.3e}")
 
             f = [f for _, f in minima]
             minf = min(f)
@@ -545,6 +548,16 @@ def optimize_lk(lk, truth, prior_width, folder, label, dual_annealing: bool=Fals
                     },
                     fl
                 )
+
+        cns.print("[bold]Estimated Parameters: [/]")
+        for p, r, s in zip(lk.partial_linear_model.child_active_params, resx, std):
+            outside = abs(p.fiducial - r)>3*s
+            cns.print(f"\t{p.name:>14}: {r:+1.3e} +- {s:1.3e} | {p.min:+1.3e} < {'[red]' if outside else ''}{p.fiducial: 1.3e}{'[/]' if outside else ''} < {p.max: 1.3e}")
+
+        best = lk.partial_linear_model.logp(params=resx)
+        fid = lk.partial_linear_model.logp()
+
+        cns.print(f"Likelihood at MAP vs. Fiducial: {best} vs. {fid}", style='red' if fid>best else 'green')    
 
     else:
         resx = None
