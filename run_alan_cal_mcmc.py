@@ -49,7 +49,7 @@ class MCMCBoundsError(ValueError):
 @click.option("-s", "--smooth", default=1)
 @click.option("-p", "--tns-width", default=3)
 @click.option("-n", "--nlive-fac", default=100)
-@click.option("-o/-O", "--optimize/--no-optimize", default=True)
+@click.option("-o", "--optimize", type=click.Choice(['none', 'dual_annealing', 'basinhopping'], case_sensitive=False), default='basinhopping')
 @click.option("--clobber/--no-clobber", default=False)
 @click.option("--set-widths/--no-set-widths", default=False)
 @click.option("--tns-mean-zero/--est-tns", default=True)
@@ -65,27 +65,6 @@ class MCMCBoundsError(ValueError):
 @click.option("--ndelay", default=1, type=int)
 @click.option("--nscale", default=1, type=int)
 def run(
-    # cterms,
-    # wterms,
-    # resume,
-    # smooth,
-    # tns_width,
-    # nlive_fac,
-    # clobber,
-    # optimize,
-    # set_widths,
-    # tns_mean_zero,
-    # antsim,
-    # ignore,
-    # as_sim,
-    # log_level,
-    # s11_model,
-    # run_mcmc,
-    # opt_iter,
-    # unweighted,
-    # cable_noise_factor,
-    # ndelay,
-    # nscale,
     **kwargs
 ):
 
