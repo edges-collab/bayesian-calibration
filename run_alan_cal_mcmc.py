@@ -57,7 +57,7 @@ class MCMCBoundsError(ValueError):
 @click.option('--ignore', multiple=True, type=click.Choice(['short', 'open','hot_load', 'ambient', 'AntSim1']))
 @click.option('--as-sim', multiple=True, type=click.Choice(['short', 'open', 'hot_load', 'ambient', 'AntSim1']))
 @click.option("--log-level", default='info', type=click.Choice(['info', 'debug', 'warn', 'error']))
-@click.option("--s11-model", multiple=True, type=click.Choice(['short', 'open', 'hot_load', 'ambient', 'rcv', 'AntSim1']))
+@click.option("--s11-sys", multiple=True, type=click.Choice(['short', 'open', 'hot_load', 'ambient', 'rcv', 'AntSim1']))
 @click.option("--run-mcmc/--no-mcmc", default=True)
 @click.option("--opt-iter", default=10)
 @click.option("--unweighted/--weighted", default=False)
