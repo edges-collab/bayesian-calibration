@@ -318,6 +318,8 @@ def get_likelihood(
     include_antsim=False,
     ignore_sources=(),
     s11_systematic_params=(),
+    cterms=None, 
+    wterms=None
 ):
     qant_var = get_var_q(fsky, alan_data.sky_q, n_terms=var_terms)
 
@@ -349,6 +351,8 @@ def get_likelihood(
         loss=alan_data.loss,
         bm_corr=alan_data.bmcorr,
         s11_systematic_params=s11_systematic_params,
+        cterms=cterms,
+        wterms=wterms,
     )
 
 

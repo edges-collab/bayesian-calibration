@@ -296,7 +296,7 @@ def get_recalibrated_src_temp_best(mcsamples, calobs, labcal):
         for name, load in loads.items()
     }
 
-    kwargs = get_kwargs(Path(mcsamples.root).name)
+    kwargs = get_kwargs(Path(mcsamples.root).parent.name)
     cal_lk = get_likelihood(**kwargs)
 
     cal_temps = {}
@@ -634,7 +634,12 @@ def clirun(**kwargs):
         optimize = None
 
     tns_mean_zero = kwargs.pop('tns_mean_zero')
-    
+
+    if 'fit_cterms' in kwargs and kwargs['fit_cterms'] is None:
+        kwargs['fit_cterms'] = kwargs['cterms']
+    if 'fit_wterms' in kwargs and kwargs['fit_wterms'] is None:
+        kwargs['fit_wterms'] = kwargs['wterms']
+
     for k, v in kwargs.items():
         if isinstance(v, list):
             kwargs[k] = tuple(v)

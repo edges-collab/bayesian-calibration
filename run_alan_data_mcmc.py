@@ -17,7 +17,7 @@ precal.FOLDER = "alan_field_and_cal"
 precal.DEFAULT_KWARGS['antsim'] = False
 
 
-def get_likelihood(nterms_fg, fix_tau, simultaneous, cterms, wterms, smooth, tns_width, est_tns=None, ignore_sources=(), as_sim=(), s11_sys=(), antsim=False):
+def get_likelihood(nterms_fg, fix_tau, simultaneous, cterms, wterms, smooth, tns_width, fit_cterms, fit_wterms, est_tns=None, ignore_sources=(), as_sim=(), s11_sys=(), antsim=False):
     calobs = utils.get_calobs(cterms=cterms, wterms=wterms, smooth=smooth)
     labcal = utils.get_labcal(calobs)
 
@@ -34,7 +34,9 @@ def get_likelihood(nterms_fg, fix_tau, simultaneous, cterms, wterms, smooth, tns
             as_sim=as_sim, 
             s11_systematic_params=s11_systematic_params, 
             est_tns=est_tns,
-            include_antsim=antsim
+            include_antsim=antsim,
+            cterms=fit_cterms,
+            wterms=fit_wterms,
         )
     else:
         return utils.get_isolated_likelihood(
@@ -139,6 +141,8 @@ def get_linear_distribution(mcsamples,  nthreads=1):
 @main.command()
 @click.option("-c", "--cterms", default=6)
 @click.option("-w", "--wterms", default=5)
+@click.option("--fit-cterms", default=None, type=int)
+@click.option("--fit-wterms", default=None, type=int)
 @click.option("-l", "--label", default=None, type=str)
 @click.option("--resume/--no-resume", default=False)
 @click.option("-s", "--smooth", default=1)
@@ -156,51 +160,8 @@ def get_linear_distribution(mcsamples,  nthreads=1):
 @click.option('--nterms-fg', default=5)
 @click.option('--fix-tau/--no-fix-tau', default=True)
 @click.option('--simultaneous/--isolated', default=True)
-def run(
-    cterms,
-    wterms,
-    label,
-    resume,
-    smooth,
-    tns_width,
-    nlive_fac,
-    clobber,
-    optimize,
-    set_widths,
-    tns_mean_zero,
-    antsim,
-    ignore,
-    as_sim,
-    log_level,
-    s11_model,
-    nterms_fg, fix_tau, simultaneous, 
-):  
-    root_logger = precal.logging.getLogger('yabf')
-    root_logger.setLevel(log_level.upper())
-    root_logger.addHandler(precal.RichHandler(rich_tracebacks=True, console=precal.cns))
-
-    precal.run_single(
-        label,
-        resume,
-        label_kwargs = {
-            'smooth': smooth,
-            'tns_width': tns_width,
-            'ignore_sources': ignore,
-            'as_sim': as_sim,
-            's11_sys': tuple(s11_model),
-            'cterms': cterms,
-            'wterms': wterms,
-            'antsim': antsim,
-            'nterms_fg': nterms_fg,
-            'fix_tau': fix_tau,
-            'simultaneous': simultaneous,
-        },
-        nlive_fac=nlive_fac,
-        clobber=clobber,
-        optimize=optimize,
-        set_widths=set_widths,
-        est_tns=np.zeros(cterms) if tns_mean_zero else None,
-    )
+def run(**kwargs):
+    precal.clirun(**kwargs)
 
 if __name__ == '__main__':
     run()
