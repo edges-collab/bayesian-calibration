@@ -597,28 +597,45 @@ class MCMCBoundsError(ValueError):
     pass
 
 
+resume = click.option("--resume/--no-resume", default=False)
+smooth= click.option("-s", "--smooth", default=8)
+tns_width = click.option("-p", "--tns-width", default=500)
+nlive_fac = click.option("-n", "--nlive-fac", default=100)
+optimize = click.option("-o", "--optimize", type=click.Choice(['none', 'dual_annealing', 'basinhopping'], case_sensitive=False), default='basinhopping')
+clobber = click.option("--clobber/--no-clobber", default=False)
+set_widths = click.option("--set-widths/--no-set-widths", default=False)
+tns_mean_zero = click.option("--tns-mean-zero/--est-tns", default=True)
+ignore_sources = click.option('--ignore-sources', multiple=True, type=click.Choice(['short', 'open','hot_load', 'ambient']))
+as_sim = click.option('--as-sim', multiple=True, type=click.Choice(['short', 'open', 'hot_load', 'ambient']))
+log_level = click.option("--log-level", default='info', type=click.Choice(['info', 'debug', 'warn', 'error']))
+s11_sys = click.option("--s11-sys", multiple=True, type=click.Choice(['short', 'open', 'hot_load', 'ambient', 'rcv']))
+run_mcmc = click.option("--run-mcmc/--no-mcmc", default=True)
+opt_iter = click.option("--opt-iter", default=10)
+unweighted = click.option("--unweighted/--weighted", default=False)
+cable_noise_factor = click.option("--cable-noise-factor", default=1, type=int)
+ndelay = click.option("--ndelay", default=1, type=int)
+nscale = click.option("--nscale", default=1, type=int)
+
 @main.command()
-@click.option("--resume/--no-resume", default=False)
-@click.option("-s", "--smooth", default=8)
-@click.option("-p", "--tns-width", default=500)
-@click.option("-n", "--nlive-fac", default=100)
-@click.option("-o", "--optimize", type=click.Choice(['none', 'dual_annealing', 'basinhopping'], case_sensitive=False), default='basinhopping')
-@click.option("--clobber/--no-clobber", default=False)
-@click.option("--set-widths/--no-set-widths", default=False)
-@click.option("--tns-mean-zero/--est-tns", default=True)
-@click.option('--ignore-sources', multiple=True, type=click.Choice(['short', 'open','hot_load', 'ambient']))
-@click.option('--as-sim', multiple=True, type=click.Choice(['short', 'open', 'hot_load', 'ambient']))
-@click.option("--log-level", default='info', type=click.Choice(['info', 'debug', 'warn', 'error']))
-@click.option("--s11-sys", multiple=True, type=click.Choice(['short', 'open', 'hot_load', 'ambient', 'rcv']))
-@click.option("--run-mcmc/--no-mcmc", default=True)
-@click.option("--opt-iter", default=10)
-@click.option("--unweighted/--weighted", default=False)
-@click.option("--cable-noise-factor", default=1, type=int)
-@click.option("--ndelay", default=1, type=int)
-@click.option("--nscale", default=1, type=int)
-def run(
-    **kwargs
-):
+@resume
+@smooth
+@tns_width
+@nlive_fac
+@optimize
+@clobber
+@set_widths
+@tns_mean_zero
+@ignore_sources
+@as_sim
+@log_level
+@s11_sys
+@run_mcmc
+@opt_iter
+@unweighted
+@cable_noise_factor
+@ndelay
+@nscale
+def run(**kwargs):
     clirun(**kwargs)
 
 

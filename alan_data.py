@@ -103,9 +103,12 @@ def get_losses(freq):
     loss = np.genfromtxt(data /"loss_file.txt")
     loss_fq = loss[:, 0]
     loss_temp = spline(loss_fq, loss[:, 2])(freq)
-    bmcorr = spline(loss_fq, loss[:, -1])(freq)
+#    bmcorr = spline(loss_fq, loss[:, -1])(freq)
     loss = spline(loss_fq, loss[:, 1])(freq)
 
+    # This is the new "averaged" beam correction (over days)
+    bmcorr = np.genfromtxt(data / "beamcorr.txt")
+    bmcorr = spline(bmcorr[:, 0], bmcorr[:, 1])(freq)
     return loss, loss_temp, bmcorr
 
 
@@ -165,7 +168,7 @@ def decalibrate(t_sky, f_sky):
     ra = spline(cal_freq, ra)(f_sky)
     rb = spline(cal_freq, rb)(f_sky)
 
-    return ((loss / bmcorr) * t_sky + loss_temp - rb - ra * 300) / (1000 * ra)
+    return ((loss * bmcorr) * t_sky + loss_temp - rb - ra * 300) / (1000 * ra)
 
 modeled_s11s = get_modeled_s11s()
 unmodeled_s11s = get_unmodeled_s11s()
@@ -180,6 +183,7 @@ unmodeled_ant_s11_file = data / "S11_blade_low_band_2015_342_03_14.txt.csv"
 sky_freq = sky_data['freq']
 cal_freq = calibration['freq']
 s11_freq = unmodeled_s11s['freq']
+sky_temp = sky_data['t_ant']
 
 sky_q = decalibrate(sky_data['t_ant'], sky_data['freq'])
 

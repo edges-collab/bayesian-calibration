@@ -40,38 +40,38 @@ get_likelihood = precal.get_likelihood
 class MCMCBoundsError(ValueError):
     pass
 
+cterms = click.option("-c", "--cterms", default=6)
+wterms = click.option("-w", "--wterms", default=5)
+fit_cterms = click.option("--fit-cterms", default=None, type=int)
+fit_wterms = click.option("--fit-wterms", default=None, type=int)
+antsim = click.option("--antsim/--no-antsim", default=False)
+
+
 @main.command()
-@click.option("-c", "--cterms", default=6)
-@click.option("-w", "--wterms", default=5)
-@click.option("--fit-cterms", default=None, type=int)
-@click.option("--fit-wterms", default=None, type=int)
-@click.option("--resume/--no-resume", default=False)
-@click.option("-s", "--smooth", default=1)
-@click.option("-p", "--tns-width", default=3)
-@click.option("-n", "--nlive-fac", default=100)
-@click.option("-o", "--optimize", type=click.Choice(['none', 'dual_annealing', 'basinhopping'], case_sensitive=False), default='basinhopping')
-@click.option("--clobber/--no-clobber", default=False)
-@click.option("--set-widths/--no-set-widths", default=False)
-@click.option("--tns-mean-zero/--est-tns", default=True)
-@click.option("--antsim/--no-antsim", default=False)
-@click.option('--ignore-sources', multiple=True, type=click.Choice(['short', 'open','hot_load', 'ambient']))
-@click.option('--as-sim', multiple=True, type=click.Choice(['short', 'open', 'hot_load', 'ambient', 'AntSim1']))
-@click.option("--log-level", default='info', type=click.Choice(['info', 'debug', 'warn', 'error']))
-@click.option("--s11-sys", multiple=True, type=click.Choice(['short', 'open', 'hot_load', 'ambient', 'rcv', 'AntSim1']))
-@click.option("--run-mcmc/--no-mcmc", default=True)
-@click.option("--opt-iter", default=10)
-@click.option("--unweighted/--weighted", default=False)
-@click.option("--cable-noise-factor", default=1, type=int)
-@click.option("--ndelay", default=1, type=int)
-@click.option("--nscale", default=1, type=int)
-def run(
-    **kwargs
-):
-
-    # lc = locals()
-    # sig = inspect.signature(run)
-    # kwargs = {k: lc[k] for k in sig}
-
+@cterms
+@wterms
+@fit_cterms
+@fit_wterms
+@antsim
+@precal.resume
+@precal.smooth
+@precal.tns_width
+@precal.nlive_fac
+@precal.optimize
+@precal.clobber
+@precal.set_widths
+@precal.tns_mean_zero
+@precal.ignore_sources
+@precal.as_sim
+@precal.log_level
+@precal.s11_sys
+@precal.run_mcmc
+@precal.opt_iter
+@precal.unweighted
+@precal.cable_noise_factor
+@precal.ndelay
+@precal.nscale
+def run(**kwargs):
     precal.clirun(**kwargs)
 
 

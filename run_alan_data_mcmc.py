@@ -6,22 +6,29 @@ from pathlib import Path
 import numpy as np
 from p_tqdm import p_map
 import run_alan_precal_mcmc as precal
+import run_alan_cal_mcmc as cal
 
 main = click.Group()
 
 
 precal.LABEL_FORMATS = (
-    "c{cterms:02d}_w{wterms:02d}_smooth{smooth:02d}_tns{tns_width:04d}_ign[{ignore_sources}]_sim[{as_sim}]_s11{s11_sys}_antsim{antsim}_fg{nterms_fg}_simul{simultaneous}_taufx{fix_tau}",
+    "c{cterms:02d}_w{wterms:02d}_smooth{smooth:02d}_tns{tns_width:04d}_ign[{ignore_sources}]_sim[{as_sim}]_s11{s11_sys}_antsim{antsim}_fg{nterms_fg}_simul{simultaneous}_taufx{fix_tau}_ns{nscale:02d}_nd{ndelay:02d}",
 )
 precal.FOLDER = "alan_field_and_cal"
 precal.DEFAULT_KWARGS['antsim'] = False
+del precal.DEFAULT_KWARGS['unweighted']
+del precal.DEFAULT_KWARGS['cable_noise_factor']
+precal.DEFAULT_KWARGS['add_noise'] = True
 
-
-def get_likelihood(nterms_fg, fix_tau, simultaneous, cterms, wterms, smooth, tns_width, fit_cterms, fit_wterms, est_tns=None, ignore_sources=(), as_sim=(), s11_sys=(), antsim=False):
+def get_likelihood(
+    nterms_fg, fix_tau, simultaneous, cterms, wterms, smooth, tns_width, 
+    fit_cterms, fit_wterms, nscale, ndelay, est_tns=None, ignore_sources=(), as_sim=(), 
+    s11_sys=(), antsim=False, sim_sky=False, add_noise=True
+):
     calobs = utils.get_calobs(cterms=cterms, wterms=wterms, smooth=smooth)
     labcal = utils.get_labcal(calobs)
 
-    s11_systematic_params = precal.define_s11_systematics(s11_sys)
+    s11_systematic_params = precal.define_s11_systematics(s11_sys, ndelay=ndelay, nscale=nscale)
     if simultaneous:
         return utils.get_likelihood(
             labcal, 
@@ -37,6 +44,8 @@ def get_likelihood(nterms_fg, fix_tau, simultaneous, cterms, wterms, smooth, tns
             include_antsim=antsim,
             cterms=fit_cterms,
             wterms=fit_wterms,
+            sim_sky=sim_sky,
+            add_noise=add_noise
         )
     else:
         return utils.get_isolated_likelihood(
@@ -139,24 +148,29 @@ def get_linear_distribution(mcsamples,  nthreads=1):
     return out_dict
 
 @main.command()
-@click.option("-c", "--cterms", default=6)
-@click.option("-w", "--wterms", default=5)
-@click.option("--fit-cterms", default=None, type=int)
-@click.option("--fit-wterms", default=None, type=int)
-@click.option("-l", "--label", default=None, type=str)
-@click.option("--resume/--no-resume", default=False)
-@click.option("-s", "--smooth", default=1)
-@click.option("-p", "--tns-width", default=3)
-@click.option("-n", "--nlive-fac", default=100)
-@click.option("-o/-O", "--optimize/--no-optimize", default=True)
-@click.option("--clobber/--no-clobber", default=False)
-@click.option("--set-widths/--no-set-widths", default=False)
-@click.option("--tns-mean-zero/--est-tns", default=True)
-@click.option("--antsim/--no-antsim", default=False)
-@click.option('--ignore', multiple=True, type=click.Choice(['short', 'open','hot_load', 'ambient', 'AntSim1']))
-@click.option('--as-sim', multiple=True, type=click.Choice(['short', 'open', 'hot_load', 'ambient', 'AntSim1']))
-@click.option("--log-level", default='info', type=click.Choice(['info', 'debug', 'warn', 'error']))
-@click.option("--s11-model", multiple=True, type=click.Choice(['short', 'open', 'hot_load', 'ambient', 'rcv', 'AntSim1']))
+@cal.cterms
+@cal.wterms
+@cal.fit_cterms
+@cal.fit_wterms
+@cal.antsim
+@precal.resume
+@precal.smooth
+@precal.tns_width
+@precal.nlive_fac
+@precal.optimize
+@precal.clobber
+@precal.set_widths
+@precal.tns_mean_zero
+@precal.ignore_sources
+@precal.as_sim
+@precal.log_level
+@precal.s11_sys
+@precal.run_mcmc
+@precal.opt_iter
+#@precal.unweighted
+#@precal.cable_noise_factor
+@precal.ndelay
+@precal.nscale
 @click.option('--nterms-fg', default=5)
 @click.option('--fix-tau/--no-fix-tau', default=True)
 @click.option('--simultaneous/--isolated', default=True)

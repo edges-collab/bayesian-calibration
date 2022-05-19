@@ -204,7 +204,7 @@ def decalibrate(labcal, f_sky, t_sky):
     ra = spline(labcal.calobs.freq.freq.to_value("MHz"), ra)(f_sky)
     rb = spline(labcal.calobs.freq.freq.to_value("MHz"), rb)(f_sky)
 
-    return ((alan_data.loss / alan_data.bmcorr) * t_sky + alan_data.loss_temp - rb - ra * 300) / (1000 * ra)
+    return ((alan_data.loss * alan_data.bmcorr) * t_sky + alan_data.loss_temp - rb - ra * 300) / (1000 * ra)
 
 
 def get_cal_lk(calobs, tns_width=500, est_tns=None, ignore_sources=(), as_sim=(), **kwargs):
@@ -246,7 +246,7 @@ def recalibrate(labcal, t_sky, f_sky, cal_lk=None, with_same=False, a=None, b=No
             a = spline(f, a)(f_sky)
             b = spline(f, b)(f_sky)
 
-    return (labcal.calobs.t_load_ns * a * q + a * 300 + b - alan_data.loss_temp) * alan_data.bmcorr / alan_data.loss
+    return (labcal.calobs.t_load_ns * a * q + a * 300 + b - alan_data.loss_temp) / (alan_data.bmcorr * alan_data.loss)
 
 
 def get_var_q(fsky, qant, n_terms=25) -> np.ndarray:
@@ -319,7 +319,9 @@ def get_likelihood(
     ignore_sources=(),
     s11_systematic_params=(),
     cterms=None, 
-    wterms=None
+    wterms=None,
+    sim_sky=False,
+    add_noise=True,
 ):
     qant_var = get_var_q(fsky, alan_data.sky_q, n_terms=var_terms)
 
@@ -335,13 +337,21 @@ def get_likelihood(
 
     sources = tuple(loads.keys())
 
+    if sim_sky:
+        # Do a kinda dumb thing... fit just the FG model to the sky data, and get those
+        # parameters as fiducial parameters for the fg model.
+        p = fg.fit(xdata=alan_data.sky_freq, ydata=alan_data.sky_temp).model_parameters
+        sky_q = decalibrate(labcal, t_sky=fg(x=alan_data.sky_freq, parameters=p) + eor()['eor_spectrum'], f_sky=alan_data.sky_freq)
+        fg = fg.with_params(p)
+    else:
+        sky_q = alan_data.sky_q
 
     return DataCalibrationLikelihood.from_labcal(
         labcal,
         calobs,
         loads=loads,
         field_freq=fsky*u.MHz,
-        q_ant=alan_data.sky_q,
+        q_ant=sky_q,
         qvar_ant=qant_var,
         fg_model=fg,
         eor_components=(eor,),
@@ -349,10 +359,12 @@ def get_likelihood(
         cal_noise=cal_noise,
         t_ns_params=get_tns_params(calobs, tns_width=tns_width, est_tns=est_tns),
         loss=alan_data.loss,
+        loss_temp=alan_data.loss_temp,
         bm_corr=alan_data.bmcorr,
         s11_systematic_params=s11_systematic_params,
         cterms=cterms,
         wterms=wterms,
+        add_noise=add_noise
     )
 
 
