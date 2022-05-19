@@ -29,6 +29,7 @@ def get_likelihood(
     labcal = utils.get_labcal(calobs)
 
     s11_systematic_params = precal.define_s11_systematics(s11_sys, ndelay=ndelay, nscale=nscale)
+    print("S11 SYSTEMATICS: ", s11_systematic_params)
     if simultaneous:
         return utils.get_likelihood(
             labcal, 
