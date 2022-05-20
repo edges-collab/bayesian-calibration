@@ -376,6 +376,9 @@ def run_lk(
         with open(folder / (root + '.lkargs.yaml'), 'w') as fl:
             yaml.dump(lk_kwargs, fl)
 
+        with open(folder / 'data.pkl', 'wb') as fl:
+            pickle.dump(lk.partial_linear_model.data, fl)
+            
     if optimize and (not resume or not out_txt.exists() or not run_mcmc):
         # Only run the optimizatino if we're not just resuming an MCMC
         lk = optimize_lk(lk, truth, prior_width,  folder, root, dual_annealing = optimize == 'dual_annealing', niter=opt_iter, set_widths=set_widths)

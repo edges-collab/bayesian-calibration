@@ -12,24 +12,24 @@ main = click.Group()
 
 
 precal.LABEL_FORMATS = (
-    "c{cterms:02d}_w{wterms:02d}_smooth{smooth:02d}_tns{tns_width:04d}_ign[{ignore_sources}]_sim[{as_sim}]_s11{s11_sys}_antsim{antsim}_fg{nterms_fg}_simul{simultaneous}_taufx{fix_tau}_ns{nscale:02d}_nd{ndelay:02d}",
+    "c{cterms:02d}_w{wterms:02d}_smooth{smooth:02d}_tns{tns_width:04d}_ign[{ignore_sources}]_sim[{as_sim}]_s11{s11_sys}_antsim{antsim}_fg{nterms_fg}_simul{simultaneous}_taufx{fix_tau}_ns{nscale:02d}_nd{ndelay:02d}_sd{seed:d}",
 )
 precal.FOLDER = "alan_field_and_cal"
 precal.DEFAULT_KWARGS['antsim'] = False
 del precal.DEFAULT_KWARGS['unweighted']
 del precal.DEFAULT_KWARGS['cable_noise_factor']
 precal.DEFAULT_KWARGS['add_noise'] = True
+precal.DEFAULT_KWARGS['seed'] = 1234
 
 def get_likelihood(
     nterms_fg, fix_tau, simultaneous, cterms, wterms, smooth, tns_width, 
     fit_cterms, fit_wterms, nscale, ndelay, est_tns=None, ignore_sources=(), as_sim=(), 
-    s11_sys=(), antsim=False, sim_sky=False, add_noise=True
+    s11_sys=(), antsim=False, sim_sky=False, add_noise=True, seed=1234
 ):
     calobs = utils.get_calobs(cterms=cterms, wterms=wterms, smooth=smooth)
     labcal = utils.get_labcal(calobs)
 
     s11_systematic_params = precal.define_s11_systematics(s11_sys, ndelay=ndelay, nscale=nscale)
-    print("S11 SYSTEMATICS: ", s11_systematic_params)
     if simultaneous:
         return utils.get_likelihood(
             labcal, 
@@ -46,7 +46,8 @@ def get_likelihood(
             cterms=fit_cterms,
             wterms=fit_wterms,
             sim_sky=sim_sky,
-            add_noise=add_noise
+            add_noise=add_noise,
+            seed=seed
         )
     else:
         return utils.get_isolated_likelihood(
@@ -175,6 +176,7 @@ def get_linear_distribution(mcsamples,  nthreads=1):
 @click.option('--nterms-fg', default=5)
 @click.option('--fix-tau/--no-fix-tau', default=True)
 @click.option('--simultaneous/--isolated', default=True)
+@click.option('--seed', default=1234)
 def run(**kwargs):
     precal.clirun(**kwargs)
 

@@ -45,6 +45,7 @@ precal.get_likelihood = partial(dmc.get_likelihood, as_sim=('open', 'short', 'ho
 @click.option('--nterms-fg', default=5)
 @click.option('--fix-tau/--no-fix-tau', default=True)
 @click.option('--simultaneous/--isolated', default=True)
+@click.option('--seed', default=1234)
 def run(**kwargs):
     precal.clirun(**kwargs)
 

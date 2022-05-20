@@ -322,6 +322,7 @@ def get_likelihood(
     wterms=None,
     sim_sky=False,
     add_noise=True,
+    seed=1234,
 ):
     qant_var = get_var_q(fsky, alan_data.sky_q, n_terms=var_terms)
 
@@ -364,7 +365,8 @@ def get_likelihood(
         s11_systematic_params=s11_systematic_params,
         cterms=cterms,
         wterms=wterms,
-        add_noise=add_noise
+        add_noise=add_noise,
+        seed=seed
     )
 
 
