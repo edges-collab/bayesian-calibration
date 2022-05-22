@@ -383,7 +383,7 @@ def get_isolated_likelihood(
     return LinearFG(
         freq=fsky,
         t_sky=recal_tsky,
-        var=qant_var * (labcal.calobs.C1(fsky) * labcal.calobs.t_load_ns) ** 2,
+        var=qant_var * (labcal.calobs.C1(fsky*u.MHz) * labcal.calobs.t_load_ns) ** 2,
         fg=fg,
         eor=eor,
     )
