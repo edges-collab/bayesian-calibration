@@ -600,7 +600,7 @@ def optimize_lk(lk, truth, prior_width, folder, label, dual_annealing: bool=Fals
 
         lk = attr.evolve(lk, t_ns_params=new_tns_params)
 
-    else:
+    elif hasattr(lk, 't_ns_params'):
         for i, p in enumerate(lk.t_ns_params.get_params()):
             if resx[i] - widths[i] < p.min or resx[i] + widths[i] > p.max:
                 raise ValueError(f"You need to set Tns[{i}] to have greater width. At least {resx[i] + widths[i]}")
@@ -665,7 +665,8 @@ def clirun(**kwargs):
     if optimize == 'none':
         optimize = None
 
-    tns_mean_zero = kwargs.pop('tns_mean_zero')
+    if 'tns_mean_zero' in kwargs:
+        kwargs['est_tns'] = np.zeros(6) if kwars.pop('tns_mean_zero') else None
 
     if 'fit_cterms' in kwargs and kwargs['fit_cterms'] is None:
         kwargs['fit_cterms'] = kwargs['cterms']
@@ -678,7 +679,6 @@ def clirun(**kwargs):
 
     run_lk(
         optimize=optimize,
-        est_tns=np.zeros(6) if tns_mean_zero else None,
         **kwargs
     )
 
