@@ -141,27 +141,26 @@ def get_samples_file(**kwargs):
     return f"outputs/{FOLDER}/{get_label(**kwargs)}/bayescal.txt"
 
 
-def get_all_cal_curves(mcsamples, nthreads=1, force=False):
+def get_all_cal_curves(mcsamples, field_freq=None, nthreads=1, force=False):
     folder = Path('outputs') / FOLDER
     kwargs = get_kwargs(Path(mcsamples.root).parent.name)
-    if force:
-        outfile = folder / (get_label(**kwargs) / "bayescal_blobs.npz")
-        log.warning(f"Overwriting {outfile} since force=True")
-    
+    outfile = folder / Path(mcsamples.root).parent.name / "bayescal_blobs.npz"
+
+
+    if force and outfile.exists():
+        log.warning(f"Overwriting {outfile} since force=True")    
+    elif outfile.exists():
+        return dict(np.load(outfile))
     else:
-        for fmt in LABEL_FORMATS:
-            label = get_label(fmt, **kwargs)
-            outfile = Path(folder) / f"{label}_blobs.npz"
-
-            if outfile.exists():
-                return dict(np.load(outfile))
-
         log.warning(f"{outfile} doesn't exist, so producing it.")
         
-    freq = np.linspace(50, 100, 200)
-
     lk = get_likelihood(**kwargs)
-    
+    freq = lk.nw_model.freq
+    nfreq = len(freq)
+
+    if field_freq is not None:
+        freq = np.concatenate((freq, field_freq))
+
     # Get the EQUAL WEIGHTS samples!
     samples = np.genfromtxt(mcsamples.root + "_equal_weights.txt")[
         :, 2 : (2 + len(lk.partial_linear_model.child_active_params))
@@ -202,6 +201,19 @@ def get_all_cal_curves(mcsamples, nthreads=1, force=False):
     out_dict = {"samples": samples, "freq": freq}
     for i, name in enumerate(out[0]):
         out_dict[name] = np.concatenate([o[name] for o in out])
+
+    if field_freq is not None:
+        out_dict['tload_field'] = out_dict['tload'][:, nfreq:]
+        out_dict['tns_field'] = out_dict['tns'][:, nfreq:]
+        out_dict['tunc_field'] = out_dict['tunc'][:, nfreq:]
+        out_dict['tcos_field'] = out_dict['tcos'][:, nfreq:]
+        out_dict['tsin_field'] = out_dict['tsin'][:, nfreq:]
+        
+        out_dict['tload'] = out_dict['tload'][:, :nfreq]
+        out_dict['tns'] = out_dict['tns'][:, :nfreq]
+        out_dict['tunc'] = out_dict['tunc'][:, :nfreq]
+        out_dict['tcos'] = out_dict['tcos'][:, :nfreq]
+        out_dict['tsin'] = out_dict['tsin'][:, :nfreq]
 
     np.savez(outfile, **out_dict)
 
@@ -378,7 +390,7 @@ def run_lk(
 
         with open(folder / 'data.pkl', 'wb') as fl:
             pickle.dump(lk.partial_linear_model.data, fl)
-            
+
     if optimize and (not resume or not out_txt.exists() or not run_mcmc):
         # Only run the optimizatino if we're not just resuming an MCMC
         lk = optimize_lk(lk, truth, prior_width,  folder, root, dual_annealing = optimize == 'dual_annealing', niter=opt_iter, set_widths=set_widths)

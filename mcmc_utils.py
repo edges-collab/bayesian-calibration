@@ -45,17 +45,39 @@ def get_all_files(direc, running_only: bool, complete_only: bool, glob=(), exc_g
     return {fl.name: fl for fl in runs}, completed
     
 
-def get_completed_mcsamples(folder):
+def get_completed_mcsamples(folder, include_incomplete=False):
     pth = Path('outputs') / folder
 
     all_runs = [p for p in sorted(pth.glob('*'))]
-    
-    completed_runs = []
-    for run in all_runs:
-        if (run / 'bayescal.paramnames').exists():
-            completed_runs.append(run / 'bayescal')
+    deleteme = False
 
-    return {fl.parent.name: loadMCSamples(str(fl)) for fl in completed_runs}
+    if not include_incomplete:
+        completed_runs = []
+        for run in all_runs:
+            if (run / 'bayescal.paramnames').exists():
+                completed_runs.append(run / 'bayescal')
+    else:
+        completed_runs = []
+        for run in all_runs:
+            if (run / 'bayescal.txt').exists():
+                s = np.genfromtxt(run / 'bayescal.txt')
+                nparams = s.shape[1] - 2
+                
+                if not (run / 'bayescal.paramnames').exists():
+                    deleteme = True
+                    # Make a temporary paramnames file
+                    with open(run / 'bayescal.paramnames', 'w') as fl:
+                        lines = [f'param{i}*\tparam{i}\n' for i in range(nparams)]
+                        fl.writelines(lines)
+
+                completed_runs.append(run / 'bayescal')
+
+    out = {fl.parent.name: loadMCSamples(str(fl)) for fl in completed_runs}
+    
+    if deleteme:
+        (run/'bayescal.paramnames').unlink()
+
+    return out
 
 
 @main.command()

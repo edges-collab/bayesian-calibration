@@ -52,6 +52,7 @@ def get_likelihood(
     else:
         return utils.get_isolated_likelihood(
             labcal, 
+            calobs,
             fsky=adata.sky_data['freq'],
             fg=LinLog(n_terms=nterms_fg), 
             eor=utils.make_absorption(adata.sky_data['freq'], fix=('tau',) if fix_tau else ()),

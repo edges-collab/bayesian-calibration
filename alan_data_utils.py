@@ -279,7 +279,6 @@ def get_tns_params(calobs, tns_width=100, est_tns=None, cterms=None):
         est_tns = est_tns[:cterms]
         mean = mean[:cterms]
 
-    print(cterms, len(est_tns), len(mean))
     return ParamVec(
         "t_lns",
         length=cterms,
@@ -371,11 +370,11 @@ def get_likelihood(
 
 
 def get_isolated_likelihood(
-    labcal, fsky, fg=LinLog(n_terms=5), eor=None, ml_solution=True
+    labcal, calobs, fsky, fg=LinLog(n_terms=5), eor=None, ml_solution=True
 ):
     qant_var = get_var_q(fsky, alan_data.sky_q)
 
-    cal_lk = get_cal_lk(labcal.calobs) if ml_solution else None
+    cal_lk = get_cal_lk(calobs) if ml_solution else None
     if eor is None:
         eor = make_absorption(fsky)
 
