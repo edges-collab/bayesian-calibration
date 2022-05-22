@@ -666,7 +666,7 @@ def clirun(**kwargs):
         optimize = None
 
     if 'tns_mean_zero' in kwargs:
-        kwargs['est_tns'] = np.zeros(6) if kwars.pop('tns_mean_zero') else None
+        kwargs['est_tns'] = np.zeros(6) if kwargs.pop('tns_mean_zero') else None
 
     if 'fit_cterms' in kwargs and kwargs['fit_cterms'] is None:
         kwargs['fit_cterms'] = kwargs['cterms']
