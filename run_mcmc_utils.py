@@ -118,8 +118,8 @@ class MCDef:
                     else:
                         kw[k] = ()
 
-            if k=='variance'  and v != "data":
-                kw["variance"] = float(v)
+                if k=='variance'  and v != "data":
+                    kw["variance"] = float(v)
 
         return {**self.default_kwargs, **kw}
         
