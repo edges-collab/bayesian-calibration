@@ -58,6 +58,7 @@ mcdef = run.MCDef(
 @precal.smooth
 @click.option('--nterms-fg', default=5)
 @click.option('--fix-tau/--no-fix-tau', default=True)
+@click.option("--cal-map", default=None, type=click.Path(exists=True))
 def clirun(**kwargs):
     run.clirun(mcdef, **kwargs)
 
