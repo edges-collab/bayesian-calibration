@@ -160,8 +160,8 @@ def run_lk(
     root = 'bayescal'
     folder = mcdef.get_path(label)
     mcroot = mcdef.get_mcroot(label)
-    out_txt = mcroot +  '.txt'
-    out_yaml = mcroot + '.meta.yml'
+    out_txt = Path(mcroot +  '.txt')
+    out_yaml = Path(mcroot + '.meta.yml')
 
     if mpi.am_single_or_primary_process:
 

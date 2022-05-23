@@ -25,7 +25,7 @@ def get_likelihood(
         fg=LinLog(n_terms=nterms_fg), 
         eor=utils.make_absorption(adata.sky_data['freq'], fix=('tau',) if fix_tau else ()),
         ml_solution=cal_map,
-        mcdef=mcdef,
+        mcdef=cal.mcdef,
     )
 
 def label_transforms(**kw):

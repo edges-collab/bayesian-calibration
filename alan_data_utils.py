@@ -381,7 +381,6 @@ def get_isolated_likelihood(
 ):
     qant_var = get_var_q(fsky, alan_data.sky_q)
 
-    cal_lk = get_cal_lk(calobs) if ml_solution else None
     if eor is None:
         eor = make_absorption(fsky)
 
