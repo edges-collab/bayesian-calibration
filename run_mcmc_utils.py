@@ -84,7 +84,7 @@ class MCDef:
         label_format = label_format or self.label_formats[-1]
 
         if self.label_transforms is not None:
-            kwargs = self.label_transforms(kwargs)
+            kwargs = self.label_transforms(**kwargs)
 
         return label_format.format(s11_sys=s11_sys, **kwargs)
 
