@@ -110,10 +110,12 @@ def show(direc, running_only: bool, complete_only: bool, show_evidence: bool, gl
 
             mod_time = datetime.fromtimestamp((fl/'bayescal.txt').stat().st_mtime)
             cns.print(mod_time.strftime('%Y-%m-%d %H:%M'))
-        else:
+        elif (fl/'bayescal.map').exists():
             mod_time = datetime.fromtimestamp((fl/'bayescal.map').stat().st_mtime)
             cns.print(f"[red](Only optimized...)[/]\t{mod_time.strftime('%Y-%m-%d %H:%M')}")
-
+        else:
+            cns.print(f"[red](Not properly started...)[/]")
+            
 @main.command()
 @click.argument('direc', type=click.Path(exists=True, file_okay=False))
 @click.argument("config", type=click.Path(exists=True, dir_okay=False))

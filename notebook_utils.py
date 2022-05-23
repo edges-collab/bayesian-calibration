@@ -22,6 +22,7 @@ def setup_mpl():
     plt.rcParams['xtick.labelsize'] = 10
     plt.rcParams['ytick.labelsize'] = 10
     plt.rcParams['legend.fontsize'] = 11
+    plt.rcParams['hatch.linewidth'] = 0.7
 
 
 def print_versions():

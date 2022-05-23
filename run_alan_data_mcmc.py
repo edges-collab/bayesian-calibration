@@ -7,19 +7,9 @@ import numpy as np
 from p_tqdm import p_map
 import run_alan_precal_mcmc as precal
 import run_alan_cal_mcmc as cal
+import run_mcmc_utils as run
 
 main = click.Group()
-
-
-precal.LABEL_FORMATS = (
-    "c{cterms:02d}_w{wterms:02d}_smooth{smooth:02d}_tns{tns_width:04d}_ign[{ignore_sources}]_sim[{as_sim}]_s11{s11_sys}_antsim{antsim}_fg{nterms_fg}_simul{simultaneous}_taufx{fix_tau}_ns{nscale:02d}_nd{ndelay:02d}_sd{seed:d}",
-)
-precal.FOLDER = "alan_field_and_cal"
-precal.DEFAULT_KWARGS['antsim'] = False
-del precal.DEFAULT_KWARGS['unweighted']
-del precal.DEFAULT_KWARGS['cable_noise_factor']
-precal.DEFAULT_KWARGS['add_noise'] = True
-precal.DEFAULT_KWARGS['seed'] = 1234
 
 def get_likelihood(
     nterms_fg, fix_tau, simultaneous, cterms, wterms, smooth, tns_width, 
@@ -58,12 +48,27 @@ def get_likelihood(
             eor=utils.make_absorption(adata.sky_data['freq'], fix=('tau',) if fix_tau else ()),
         )
 
-precal.get_likelihood = get_likelihood
+mcdef = run.MCDef(
+    label_formats = (
+        "c{cterms:02d}_w{wterms:02d}_smooth{smooth:02d}_tns{tns_width:04d}_ign[{ignore_sources}]_sim[{as_sim}]_s11{s11_sys}_antsim{antsim}_fg{nterms_fg}_simul{simultaneous}_taufx{fix_tau}_ns{nscale:02d}_nd{ndelay:02d}_sd{seed:d}",
+    ),
+    folder= 'alan_fied_and_cal',
+    default_kwargs={
+        **{k: v for k,v in precal.mcdef.default_kwargs if k not in ('unweighted', 'cable_noise_factor')},
+        **{
+            'antsim': False,
+            'add_noise': True,
+            'seed': 1234
+        }
+    },
+    get_likelihood=get_likelihood,
+)
 
 
-def get_linear_distribution(mcsamples,  nthreads=1):
+
+def get_linear_distribution(mcdef, mcsamples,  nthreads=1):
     freq = np.linspace(50, 100, 200)
-    kwargs = precal.get_kwargs(mcsamples.root)
+    kwargs = mcdef.get_kwargs(mcsamples.root)
     print(mcsamples.root, kwargs)
 
     outfile = Path(mcsamples.root + "_blobs.npz")
@@ -80,7 +85,7 @@ def get_linear_distribution(mcsamples,  nthreads=1):
     iso = 'isolated' in mcsamples.root
 
     def do_stuff(thread):
-        lk = get_likelihood(**kwargs)
+        lk = mcdef.get_likelihood(**kwargs)
 
         nn = last_n if thread == nthreads-1 else nper_thread
         model = lk.partial_linear_model.linear_model.model
@@ -151,25 +156,19 @@ def get_linear_distribution(mcsamples,  nthreads=1):
     return out_dict
 
 @main.command()
+@run.all_mc_options
 @cal.cterms
 @cal.wterms
 @cal.fit_cterms
 @cal.fit_wterms
 @cal.antsim
-@precal.resume
 @precal.smooth
 @precal.tns_width
-@precal.nlive_fac
-@precal.optimize
-@precal.clobber
 @precal.set_widths
 @precal.tns_mean_zero
 @precal.ignore_sources
 @precal.as_sim
-@precal.log_level
 @precal.s11_sys
-@precal.run_mcmc
-@precal.opt_iter
 #@precal.unweighted
 #@precal.cable_noise_factor
 @precal.ndelay
@@ -178,8 +177,8 @@ def get_linear_distribution(mcsamples,  nthreads=1):
 @click.option('--fix-tau/--no-fix-tau', default=True)
 @click.option('--simultaneous/--isolated', default=True)
 @click.option('--seed', default=1234)
-def run(**kwargs):
-    precal.clirun(**kwargs)
+def clirun(**kwargs):
+    run.clirun(mcdef, **kwargs)
 
 if __name__ == '__main__':
-    run()
+    clirun()

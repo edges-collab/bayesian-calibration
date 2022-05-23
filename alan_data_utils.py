@@ -34,6 +34,7 @@ from edges_cal.cal_coefficients import HotLoadCorrection
 from edges_analysis.analysis.s11 import AntennaS11
 import yaml
 from astropy import units as u
+import pickle
 
 with open(Path('~/.edges.yml').expanduser(), 'r') as fl:
     CALPATH = Path(yaml.safe_load(fl)['cal']['raw-cals']).expanduser() / 'Receiver01'
@@ -45,11 +46,16 @@ def make_absorption(freq, fix=tuple()):
     params = {
         "A": {"max": 2, "min": 0.05, "fiducial": 0.5},
         "nu0": {"min": 60, "max": 90, "fiducial": 78.5},
-        "tau": {"min": 1, "max": 20, "fiducial": 7},
+        "tau": {"min": 1, "max": 40, "fiducial": 7},
         "w": {"min": 1, "max": 25, "fiducial": 15},
     }
 
     fid = {p: params.pop(p)["fiducial"] for p in fix}
+    
+    if isinstance(fix, dict):
+        for p, v in fix.items():
+            fid[p] = v
+
     return AbsorptionProfile(name="absorption", fiducial=fid, params=params, freqs=freq)
 
 
@@ -227,7 +233,7 @@ def get_cal_lk(calobs, tns_width=500, est_tns=None, ignore_sources=(), as_sim=()
     )
 
 
-def recalibrate(labcal, t_sky, f_sky, cal_lk=None, with_same=False, a=None, b=None):
+def recalibrate(labcal, t_sky, f_sky, cal_lk=None, cal_optx=None, with_same=False, a=None, b=None):
     f = labcal.calobs.freq.freq
     if with_same:
         q = decalibrate(labcal, f_sky, t_sky)
@@ -236,9 +242,10 @@ def recalibrate(labcal, t_sky, f_sky, cal_lk=None, with_same=False, a=None, b=No
 
     if a is None or b is None:
         if cal_lk is not None:
-            res = run_map(cal_lk.partial_linear_model)
+            if cal_optx is None:
+                cal_optx = run_map(cal_lk.partial_linear_model).x
             a, b = cal_lk.get_linear_coefficients(
-                freq=f_sky, labcal=labcal, params=res.x
+                freq=f_sky, labcal=labcal, params=cal_optx
             )
         else:
             a, b = labcal.get_linear_coefficients()
@@ -370,7 +377,7 @@ def get_likelihood(
 
 
 def get_isolated_likelihood(
-    labcal, calobs, fsky, fg=LinLog(n_terms=5), eor=None, ml_solution=True
+    labcal, calobs, fsky, fg=LinLog(n_terms=5), eor=None, ml_solution=None, mcdef=None,
 ):
     qant_var = get_var_q(fsky, alan_data.sky_q)
 
@@ -378,7 +385,15 @@ def get_isolated_likelihood(
     if eor is None:
         eor = make_absorption(fsky)
 
-    recal_tsky = recalibrate(labcal, t_sky=alan_data.sky_data["t_ant"], f_sky=fsky, cal_lk=cal_lk)
+    if ml_solution:
+        with open(ml_solution, 'rb') as fl:
+            optx = pickle.load(fl)['optres'].x
+
+        cal_lk = mcdef.get_likelihood_from_label(Path(ml_solution).parent.name)
+    else:
+        optx = None
+
+    recal_tsky = recalibrate(labcal, t_sky=alan_data.sky_data["t_ant"], f_sky=fsky, cal_lk=cal_lk, cal_optx=optx)
 
     return LinearFG(
         freq=fsky,
