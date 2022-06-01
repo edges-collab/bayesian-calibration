@@ -50,7 +50,7 @@ def get_completed_mcsamples(folder, include_incomplete=False):
 
     all_runs = [p for p in sorted(pth.glob('*'))]
     deleteme = False
-
+    
     if not include_incomplete:
         completed_runs = []
         for run in all_runs:

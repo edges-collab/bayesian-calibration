@@ -329,6 +329,7 @@ def get_likelihood(
     sim_sky=False,
     add_noise=True,
     seed=1234,
+    remove_eor:bool=False,
 ):
     qant_var = get_var_q(fsky, alan_data.sky_q, n_terms=var_terms)
 
@@ -353,6 +354,11 @@ def get_likelihood(
     else:
         sky_q = alan_data.sky_q
 
+    if remove_eor:
+        teor = eor()['eor_spectrum']
+        qeor = decalibrate(labcal, teor, f_sky=alan_data.sky_freq)
+        sky_q = sky_q - qeor
+        
     return DataCalibrationLikelihood.from_labcal(
         labcal,
         calobs,
