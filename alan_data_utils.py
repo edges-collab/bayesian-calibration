@@ -356,7 +356,7 @@ def get_likelihood(
 
     if remove_eor:
         teor = eor()['eor_spectrum']
-        qeor = decalibrate(labcal, teor, f_sky=alan_data.sky_freq)
+        qeor = decalibrate(labcal, t_sky=teor, f_sky=alan_data.sky_freq)
         sky_q = sky_q - qeor
         
     return DataCalibrationLikelihood.from_labcal(
